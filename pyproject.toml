@@ -1,7 +1,7 @@
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "comviver.settings.test"
 python_files = ["test_*.py"]
-testpaths = ["accounts/tests", "core/tests", "tests"]
+testpaths = ["accounts/tests", "core/tests", "acolhidos/tests", "doacoes/tests", "tests"]
 addopts = "--reuse-db -q"
 
 [tool.ruff]

@@ -11,6 +11,7 @@ urlpatterns = [
     path("media/<path:caminho>", servir_media_protegida, name="media_protegida"),
     path("", include("accounts.urls")),
     path("", include("acolhidos.urls")),
+    path("", include("doacoes.urls")),
     path("", include("core.urls")),
 ]
 
