@@ -4,6 +4,7 @@ from pathlib import Path
 from urllib.request import urlopen
 
 ASSETS = {
+    "htmx.min.js": "htmx.org@2.0.3/dist/htmx.min.js",
     "bootstrap.min.css": "bootstrap@5.3.3/dist/css/bootstrap.min.css",
     "bootstrap.min.css.map": "bootstrap@5.3.3/dist/css/bootstrap.min.css.map",
     "bootstrap.bundle.min.js": "bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js",

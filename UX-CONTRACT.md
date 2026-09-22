@@ -25,8 +25,11 @@ Não há regras de cobrança ou pagamentos nesta fase.
 | Toast | components/messages.html + Django messages | este contrato | sucesso, erro inline persistente | pytest + navegador |
 | CRUD | accounts/views.py | plano fase 1, tarefa 10 | retorno à lista | pytest + navegador |
 | Dialog | dialog HTML + comviver.js | este contrato | alteração de permissão, trabalho não salvo | teclado, Escape, foco |
+| Indicadores do painel | templates/core/painel.html + comviver.js | este contrato | um card visível, navegação manual e sem rotação automática | teclado, leitor de tela, viewport estreito |
 
-Não há seleção em massa nem entrada de datas nesta fase.
+Não há seleção em massa. As fases 2 e 3 usam datas nativas, com calendário e
+geometria pertencentes ao navegador/sistema operacional. Os dados gravados usam
+ISO; a apresentação do sistema usa pt-BR e America/Sao_Paulo.
 
 ## Navegação de dados
 
@@ -82,3 +85,29 @@ Formulários alertam ao sair com alterações; nenhum rascunho sensível é pers
 Falha de rede usa recuperação do navegador e retorno ao formulário; não há
 garantia de preservação de senhas após navegação ou expiração. Edições simultâneas
 de dados comuns seguem o último salvamento; perfis são lidos novamente a cada pedido.
+
+## Doações — fase 3
+
+| Componente | Responsável | Comportamento |
+|---|---|---|
+| Campos | components/fields.html + FormularioAcessivelMixin | erros associados e valores preservados |
+| Listas | BaseListView + doacoes/partials/_pagination.html | 25 registros, filtros na URL, página ajustada |
+| Busca de doador | doacoes.js + HTMX + BuscarDoadorView | mínimo 3 letras, 300 ms, cancelamento, IME, setas/Enter/Escape |
+| Seleção de doador/tipo/campanha | select nativo | opção Anônimo; popup de responsabilidade do navegador |
+| Recibo | doacoes/recibo.html + core/pdf.py | mesmo HTML para tela, impressão e PDF |
+
+Na busca auxiliar de doador, texto é transitório e não vai para a URL da página;
+selecionar uma sugestão atualiza o campo nativo. Falha de rede deixa a seleção
+nativa disponível. Limpar cancela a requisição e mantém o doador já selecionado.
+Nas listagens, Enter/Filtrar confirma a busca; limpar preserva os demais filtros.
+
+Admin e Operacional cadastram doadores, registram/alteram doações e emitem recibos.
+Técnico consulta as listas e o histórico do doador. Campanhas só são alteradas por
+Admin. Permissões são verificadas em view, formulário e ações exibidas.
+Não há exclusão pela interface; modelos preservam exclusão lógica.
+
+Salvar e registrar outra mantém apenas data e doador. O envio bloqueia botões sem
+perder a ação escolhida. Alterações de doação registram autor no histórico; quem
+recebeu originalmente é preservado. Campanhas ficam ativas até o fim da data final.
+Consultar/baixar recibo não altera estado. Marcar entregue exige POST com CSRF e é
+idempotente. O renderizador PDF aceita somente CSS/fontes locais autorizados.

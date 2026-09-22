@@ -1,8 +1,6 @@
 import pytest
 from django.urls import reverse
 
-from doacoes.factories import DoacaoFactory, DoadorFactory
-
 pytestmark = pytest.mark.django_db
 
 ROTAS_ESCRITA = [

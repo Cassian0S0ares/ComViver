@@ -21,7 +21,13 @@ def menu(request):
         {"rotulo": "Medicações", "url": reverse("acolhidos:medicacoes"), "icone": "capsule"}
     )
 
-    # Os demais itens de dominio entram nas fases 3 a 5, cada um com seu recorte.
+    itens.extend(
+        [
+            {"rotulo": "Doações", "url": reverse("doacoes:lista"), "icone": "box2-heart"},
+            {"rotulo": "Doadores", "url": reverse("doacoes:doador_lista"), "icone": "people"},
+            {"rotulo": "Campanhas", "url": reverse("doacoes:campanha_lista"), "icone": "flag"},
+        ]
+    )
 
     if request.user.pode_gerenciar_usuarios():
         itens.append(

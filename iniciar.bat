@@ -4,6 +4,7 @@ title ComViver - servidor de desenvolvimento
 cd /d "%~dp0"
 
 set "PY=%~dp0.venv\Scripts\python.exe"
+if exist "%~dp0.venv312\Scripts\python.exe" set "PY=%~dp0.venv312\Scripts\python.exe"
 set "DJANGO_SETTINGS_MODULE=comviver.settings.dev"
 set "PORTA=8000"
 
@@ -38,8 +39,8 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Abrindo navegador em http://127.0.0.1:%PORTA%/
-start "" http://127.0.0.1:%PORTA%/
+echo O navegador sera aberto quando o servidor estiver pronto.
+start "" /b "%PY%" "%~dp0scripts\abrir_navegador.py" %PORTA%
 
 echo Servidor iniciando. Feche esta janela ou pressione Ctrl+C para parar.
 echo.

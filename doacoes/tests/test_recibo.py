@@ -22,9 +22,7 @@ class TestRecibo:
 
     def test_recibo_mostra_o_doador_e_o_valor(self, client, usuario_operacional):
         doador = DoadorFactory(nome="Padaria Central")
-        doacao = DoacaoFactory(
-            doador=doador, tipo=TipoDoacao.DINHEIRO, valor=Decimal("250.00")
-        )
+        doacao = DoacaoFactory(doador=doador, tipo=TipoDoacao.DINHEIRO, valor=Decimal("250.00"))
         client.force_login(usuario_operacional)
         conteudo = client.get(reverse("doacoes:recibo", args=[doacao.pk])).content.decode()
         assert "Padaria Central" in conteudo
@@ -55,16 +53,12 @@ class TestRecibo:
     def test_formato_pdf_devolve_pdf(self, client, usuario_operacional):
         doacao = DoacaoFactory()
         client.force_login(usuario_operacional)
-        resposta = client.get(
-            reverse("doacoes:recibo", args=[doacao.pk]) + "?formato=pdf"
-        )
+        resposta = client.get(reverse("doacoes:recibo", args=[doacao.pk]) + "?formato=pdf")
         assert resposta["Content-Type"] == "application/pdf"
         assert resposta.content[:4] == b"%PDF"
 
     def test_pdf_tem_nome_de_arquivo_legivel(self, client, usuario_operacional):
         doacao = DoacaoFactory()
         client.force_login(usuario_operacional)
-        resposta = client.get(
-            reverse("doacoes:recibo", args=[doacao.pk]) + "?formato=pdf"
-        )
+        resposta = client.get(reverse("doacoes:recibo", args=[doacao.pk]) + "?formato=pdf")
         assert f"recibo-{doacao.pk}.pdf" in resposta["Content-Disposition"]

@@ -163,6 +163,10 @@ class Command(BaseCommand):
                 autorizado_retirar=indice % 2 == 0,
             )
 
+        from doacoes.demo import criar_doacoes_demo
+
+        criar_doacoes_demo()
+        self.stdout.write("Doadores, campanha e doações fictícias preparados.")
         self.stdout.write(
             self.style.SUCCESS(
                 f"{len(ACOLHIDOS)} acolhidos criados com ficha, saúde, escola e responsáveis."

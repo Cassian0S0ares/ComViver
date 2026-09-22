@@ -7,8 +7,8 @@ from doacoes.factories import DoacaoFactory, DoadorFactory
 from doacoes.models import TipoDoacao
 from doacoes.services import (
     doadores_recorrentes_inativos,
-    total_arrecadado,
     totais_por_tipo,
+    total_arrecadado,
 )
 
 pytestmark = pytest.mark.django_db
@@ -28,7 +28,8 @@ class TestTotaisPorTipo:
     def test_respeita_a_consulta_recebida(self):
         DoacaoFactory(tipo=TipoDoacao.DINHEIRO, valor=Decimal("100.00"))
         DoacaoFactory(
-            tipo=TipoDoacao.DINHEIRO, valor=Decimal("50.00"),
+            tipo=TipoDoacao.DINHEIRO,
+            valor=Decimal("50.00"),
             data_recebimento=date.today() - timedelta(days=365),
         )
         from doacoes.models import Doacao

@@ -124,3 +124,16 @@ Scrollbars globais têm track, thumb, hover e active definidos nos tokens.
 - Não exibir módulos futuros como links operáveis.
 - Não usar fotos de crianças, selos de confiança inventados ou dados sensíveis como decoração.
 - Não trocar a identidade ao acrescentar os módulos das fases seguintes.
+
+## Aplicação na fase 3
+
+Doações, doadores e campanhas reutilizam a navegação, superfícies, campos,
+tabelas e feedback existentes. Menta destaca o vínculo de apoio; os totais têm
+algarismos tabulares. Nenhuma soma mistura dinheiro, itens e serviços.
+O cadastro rápido tem uma coluna de orientação e mantém doador/data no próximo
+registro. No celular, os blocos se empilham e a tabela rola dentro da superfície.
+
+Os recibos têm variante A4 com as mesmas fontes, azul e menta, convertidos para
+cores sRGB em `static/css/recibo.css` para compatibilidade com impressão/PDF.
+A variante elimina a navegação da folha impressa. CNPJ e endereço institucionais
+só serão apresentados quando forem informados; não há dados fictícios no recibo.

@@ -23,7 +23,11 @@ class PainelView(PerfilRequiredMixin, TemplateView):
         return contexto
 
     def _montar_cartoes(self) -> list[dict]:
+        from django.utils import timezone
+
         from acolhidos.models import Acolhido, Medicacao, StatusAcolhido
+        from doacoes.models import Doacao
+        from doacoes.services import doadores_recorrentes_inativos, total_arrecadado
 
         cartoes = [
             {
@@ -60,6 +64,31 @@ class PainelView(PerfilRequiredMixin, TemplateView):
                 }
             )
 
+        hoje = timezone.localdate()
+        recebidas = Doacao.objects.filter(
+            data_recebimento__gte=hoje.replace(day=1), data_recebimento__lte=hoje
+        )
+        valor = f"{total_arrecadado(recebidas):,.2f}"
+        valor = valor.replace(",", "X").replace(".", ",").replace("X", ".")
+        cartoes.append(
+            {
+                "titulo": "Doações do mês",
+                "valor": f"R$ {valor}",
+                "descricao": f"em dinheiro · {recebidas.count()} contribuições de todos os tipos",
+                "icone": "box2-heart",
+                "url": reverse("doacoes:lista"),
+            }
+        )
+        if self.request.user.e_admin:
+            cartoes.append(
+                {
+                    "titulo": "Doadores para retomar contato",
+                    "valor": doadores_recorrentes_inativos().count(),
+                    "descricao": "recorrentes sem contribuição há 60 dias",
+                    "icone": "person-heart",
+                    "url": reverse("doacoes:doador_lista") + "?inativos=1",
+                }
+            )
         return cartoes
 
 
@@ -71,6 +100,11 @@ class BaseListView(PerfilRequiredMixin, ListView):
 
     paginate_by = 25
     campos_busca: list[str] = []
+
+    def paginate_queryset(self, queryset, page_size):
+        paginator = self.get_paginator(queryset, page_size)
+        page = paginator.get_page(self.request.GET.get("page"))
+        return paginator, page, page.object_list, page.has_other_pages()
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -85,6 +119,9 @@ class BaseListView(PerfilRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
         contexto["busca"] = self.request.GET.get("q", "")
+        filtros = self.request.GET.copy()
+        filtros.pop("page", None)
+        contexto["filtros_query"] = filtros.urlencode()
         return contexto
 
 

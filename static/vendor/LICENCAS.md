@@ -7,3 +7,6 @@
 
 Fontes distribuídas por Fontsource (Manrope 5.2.6; Source Sans 3 5.2.8).
 Arquivos servidos pelo próprio Django; nenhuma requisição a CDN em tempo de uso.
+# HTMX
+
+HTMX 2.0.3 — licença BSD 2-Clause: https://github.com/bigskysoftware/htmx/blob/v2.0.3/LICENSE

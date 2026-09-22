@@ -12,7 +12,7 @@
 <div class="app-main">
   <header class="topbar"><button class="icon-button mobile-menu" type="button" disabled data-enhancement aria-controls="navegacao" aria-expanded="false" aria-label="Abrir navegação" data-menu><i class="bi bi-list" aria-hidden="true"></i></button><div class="breadcrumb-line">ComViver <span>/</span> {% block cabecalho %}Painel{% endblock %}</div><div class="account-menu"><span class="avatar">{{ user.first_name|default:user.username|slice:':1'|upper }}</span><span class="account-name">{{ user.get_full_name|default:user.username }}<small>{{ user.get_perfil_display }}</small></span><form method="post" action="{% url 'accounts:logout' %}" novalidate>{% csrf_token %}<button class="icon-button" aria-label="Sair do sistema" title="Sair do sistema"><i class="bi bi-box-arrow-right" aria-hidden="true"></i></button></form></div></header>
   <main id="conteudo" class="page-content" tabindex="-1">{% include 'components/messages.html' %}{% block conteudo %}{% endblock %}</main>
-  <footer class="app-footer"><span>ComViver · Lar Padre José Gumercindo</span><a href="{% url 'accounts:trocar_senha' %}">Alterar minha senha</a></footer>
+  <footer class="app-footer"><span>ComViver · Lar Padre José Gumercindo</span></footer>
 </div>
 <dialog id="unsaved-dialog" aria-labelledby="unsaved-title" aria-describedby="unsaved-description"><h2 id="unsaved-title">Sair sem salvar?</h2><p id="unsaved-description">As alterações deste formulário serão perdidas.</p><div class="actions"><button class="button button-secondary" type="button" disabled data-enhancement data-dialog-close autofocus>Continuar editando</button><button class="button button-danger" type="button" disabled data-enhancement data-discard>Sair sem salvar</button></div></dialog>
 </body></html>

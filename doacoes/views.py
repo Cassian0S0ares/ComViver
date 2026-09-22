@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db.models import Count, Q, Sum
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -169,7 +170,15 @@ class CampanhaListView(BaseListView):
         return situacao if situacao in self.SITUACOES else "ativas"
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset().annotate(
+            registros_itens=Count(
+                "doacoes",
+                filter=Q(
+                    doacoes__deleted_at__isnull=True,
+                    doacoes__tipo__in=[tipo for tipo, _ in TipoDoacao.choices if tipo != TipoDoacao.DINHEIRO],
+                ),
+            )
+        )
         situacao = self._situacao()
         if situacao == "ativas":
             return qs.ativas()
@@ -179,6 +188,37 @@ class CampanhaListView(BaseListView):
 
     def get_context_data(self, **kwargs):
         return super().get_context_data(**kwargs) | {"situacao_filtrada": self._situacao()}
+
+
+class CampanhaDetailView(PerfilRequiredMixin, DetailView):
+    model = Campanha
+    template_name = "doacoes/campanha_detail.html"
+    context_object_name = "campanha"
+    perfis_permitidos = TODOS_OS_PERFIS
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        doacoes = self.object.doacoes.select_related("doador", "recebido_por")
+        pagina = Paginator(doacoes, 25).get_page(self.request.GET.get("page"))
+        itens = list(
+            Doacao.objects.filter(campanha=self.object)
+            .exclude(tipo=TipoDoacao.DINHEIRO)
+            .values("tipo", "descricao", "unidade")
+            .annotate(quantidade_total=Sum("quantidade"), registros=Count("pk"))
+            .order_by("tipo", "descricao", "unidade")
+        )
+        tipos = dict(TipoDoacao.choices)
+        for item in itens:
+            item["tipo_display"] = tipos[item["tipo"]]
+        contexto.update(
+            doacoes=pagina.object_list,
+            page_obj=pagina,
+            paginator=pagina.paginator,
+            filtros_query="",
+            resumo_itens=itens,
+            total_registros_itens=sum(item["registros"] for item in itens),
+        )
+        return contexto
 
 
 class CampanhaCreateView(BaseCreateView):

@@ -63,15 +63,16 @@ class TestDoacao:
 
     def test_descricao_quantidade_de_item_contavel(self):
         doacao = DoacaoFactory(
-            tipo=TipoDoacao.ALIMENTO, descricao="Arroz 5kg",
-            quantidade=20, unidade="pacotes", valor=None,
+            tipo=TipoDoacao.ALIMENTO,
+            descricao="Arroz 5kg",
+            quantidade=20,
+            unidade="pacotes",
+            valor=None,
         )
         assert doacao.descricao_quantidade == "20 pacotes"
 
     def test_descricao_quantidade_de_dinheiro(self):
-        doacao = DoacaoFactory(
-            tipo=TipoDoacao.DINHEIRO, valor=Decimal("250.00"), quantidade=None
-        )
+        doacao = DoacaoFactory(tipo=TipoDoacao.DINHEIRO, valor=Decimal("250.00"), quantidade=None)
         assert doacao.descricao_quantidade == "R$ 250,00"
 
     def test_exclusao_e_logica(self):
