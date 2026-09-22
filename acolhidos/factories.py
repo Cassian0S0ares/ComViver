@@ -1,6 +1,16 @@
+from datetime import date
+
 import factory
 
-from acolhidos.models import Acolhido, Responsavel, Sexo, VinculoFamiliar
+from acolhidos.models import (
+    Acolhido,
+    DadosSaude,
+    FichaAcolhimento,
+    Medicacao,
+    Responsavel,
+    Sexo,
+    VinculoFamiliar,
+)
 
 
 class AcolhidoFactory(factory.django.DjangoModelFactory):
@@ -32,3 +42,34 @@ class VinculoFamiliarFactory(factory.django.DjangoModelFactory):
     acolhido = factory.SubFactory(AcolhidoFactory)
     responsavel = factory.SubFactory(ResponsavelFactory)
     parentesco = "Mãe"
+
+
+class FichaAcolhimentoFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = FichaAcolhimento
+
+    acolhido = factory.SubFactory(AcolhidoFactory)
+    data_entrada = factory.LazyFunction(date.today)
+    motivo = "Negligência familiar"
+    orgao_requisitante = "Conselho Tutelar"
+    processo_numero = factory.Sequence(lambda n: f"000{n}-56.2026.8.13.0301")
+
+
+class DadosSaudeFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = DadosSaude
+
+    acolhido = factory.SubFactory(AcolhidoFactory)
+    tipo_sanguineo = "O+"
+
+
+class MedicacaoFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Medicacao
+
+    acolhido = factory.SubFactory(AcolhidoFactory)
+    nome = "Dipirona"
+    dosagem = "500mg"
+    frequencia = "8h e 20h"
+    inicio = factory.LazyFunction(date.today)
+    fim = None
