@@ -44,6 +44,19 @@ python manage.py runserver
 Abra `http://127.0.0.1:8000/`. O superusuário inicial tem perfil Administrador.
 Novas pessoas cadastradas pela interface precisam trocar a senha no primeiro acesso.
 
+## Dados de demonstração
+
+```powershell
+python manage.py seed_demo
+```
+
+Cria nove acolhidos fictícios com ficha, saúde, escolaridade e responsáveis,
+incluindo dois irmãos que compartilham a mesma responsável e um acolhido já
+desligado. Use `--limpar` para apagar e recriar do zero. O comando só roda com
+`DEBUG=True` (ou com `--forcar`, apenas em banco descartável).
+
+Nenhum dado gerado corresponde a pessoa real.
+
 ## Qualidade
 
 ```powershell

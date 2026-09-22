@@ -25,3 +25,17 @@ class PerfilRequiredMixin(LoginRequiredMixin):
         if request.user.perfil not in self.perfis_permitidos:
             raise PermissionDenied("Seu perfil não tem acesso a esta página.")
         return super().dispatch(request, *args, **kwargs)
+
+
+class RegistraAcessoFichaMixin:
+    """Registra em LogAcessoFicha toda abertura da ficha.
+
+    Usar apenas em views cujo `get_object()` devolva um Acolhido.
+    """
+
+    def get_object(self, queryset=None):
+        objeto = super().get_object(queryset)
+        from accounts.models import AcaoFicha, LogAcessoFicha
+
+        LogAcessoFicha.registrar(self.request.user, objeto, AcaoFicha.VIEW)
+        return objeto

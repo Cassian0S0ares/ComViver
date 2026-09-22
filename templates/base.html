@@ -6,7 +6,7 @@
   <a class="brand" href="{% url 'core:painel' %}" aria-label="ComViver — início">{% include 'components/brand.html' %}</a>
   <div class="institution"><span class="institution-mark"><i class="bi bi-house-heart" aria-hidden="true"></i></span><span>Lar Padre<br><strong>José Gumercindo</strong></span></div>
   <p class="nav-label">Seu espaço de trabalho</p>
-  <nav aria-label="Navegação principal">{% for item in menu_itens %}<a class="nav-link {% if item.url == request.path or item.rotulo == 'Usuários' and '/usuarios/' in request.path %}is-current{% endif %}" href="{{ item.url }}" {% if item.url == request.path or item.rotulo == 'Usuários' and '/usuarios/' in request.path %}aria-current="page"{% endif %}><i class="bi bi-{{ item.icone }}" aria-hidden="true"></i>{{ item.rotulo }}</a>{% endfor %}</nav>
+  <nav aria-label="Navegação principal">{% for item in menu_itens %}<a class="nav-link {% if item.atual %}is-current{% endif %}" href="{{ item.url }}" {% if item.atual %}aria-current="page"{% endif %}><i class="bi bi-{{ item.icone }}" aria-hidden="true"></i>{{ item.rotulo }}</a>{% endfor %}</nav>
   <div class="sidebar-bottom"><p>Cuidado que aproxima.<br><span>Organização que acolhe.</span></p><span class="internal-label"><i class="bi bi-shield-lock" aria-hidden="true"></i> Uso interno da instituição</span></div>
 </aside>
 <div class="app-main">

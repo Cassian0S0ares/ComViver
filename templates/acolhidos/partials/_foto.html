@@ -1,0 +1,1 @@
+{% if acolhido.foto %}<img class="foto-acolhido" src="{% url 'media_protegida' acolhido.foto.name %}" alt="" width="{{ tamanho }}" height="{{ tamanho }}" loading="lazy">{% else %}<span class="avatar avatar-soft {% if tamanho > 56 %}avatar-xl{% else %}avatar-lg{% endif %}" aria-hidden="true">{{ acolhido.nome_exibicao|slice:':1'|upper }}</span>{% endif %}

@@ -22,8 +22,11 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "axes",
+    "simple_history",
+    "formtools",
     "core",
     "accounts",
+    "acolhidos",
 ]
 
 MIDDLEWARE = [
@@ -33,6 +36,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "simple_history.middleware.HistoryRequestMiddleware",
     "accounts.middleware.TrocaSenhaObrigatoriaMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -113,6 +117,10 @@ STORAGES = {
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Arquivos enviados no meio do assistente de acolhimento, antes de o cadastro
+# ser concluido. Fica fora de MEDIA_ROOT para nunca ser servido pela rota /media/.
+ASSISTENTE_TEMP_DIR = BASE_DIR / ".assistente"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -13,11 +13,19 @@ def menu(request):
         {"rotulo": "Painel", "url": reverse("core:painel"), "icone": "house"},
     ]
 
-    # Os itens de dominio entram nas fases 2 a 5, cada um com seu recorte de perfil.
+    # Todos os perfis veem a lista; o recorte de sigilo acontece dentro da ficha.
+    itens.append({"rotulo": "Acolhidos", "url": reverse("acolhidos:lista"), "icone": "emoji-smile"})
+
+    # Os demais itens de dominio entram nas fases 3 a 5, cada um com seu recorte.
 
     if request.user.pode_gerenciar_usuarios():
         itens.append(
             {"rotulo": "Usuários", "url": reverse("accounts:usuario_list"), "icone": "people"}
         )
+
+    # Marca o item da secao atual, inclusive nas subpaginas (/acolhidos/12/).
+    for item in itens:
+        url = item["url"]
+        item["atual"] = request.path == url or (url != "/" and request.path.startswith(url))
 
     return {"menu_itens": itens}

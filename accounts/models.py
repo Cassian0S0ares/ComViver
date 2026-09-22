@@ -91,3 +91,46 @@ class Usuario(AbstractUser):
 
         grupo, _ = Group.objects.get_or_create(name=self.GRUPO_POR_PERFIL[self.perfil])
         self.groups.set([grupo])
+
+
+class AcaoFicha(models.TextChoices):
+    VIEW = "VIEW", "Consultou"
+    EDIT = "EDIT", "Alterou"
+
+
+class LogAcessoFicha(models.Model):
+    """Registro de acesso a ficha de acolhido.
+
+    O historico de alteracoes nao revela quem apenas abriu e leu a ficha. Em
+    instituicao de acolhimento essa informacao e necessaria, e precisa
+    sobreviver a exclusao do usuario — por isso `usuario_descricao` guarda a
+    identificacao em texto.
+    """
+
+    usuario = models.ForeignKey(
+        "accounts.Usuario", null=True, on_delete=models.SET_NULL, related_name="acessos_ficha"
+    )
+    usuario_descricao = models.CharField("usuário", max_length=200, blank=True)
+    acolhido = models.ForeignKey(
+        "acolhidos.Acolhido", on_delete=models.CASCADE, related_name="acessos"
+    )
+    data_hora = models.DateTimeField("data e hora", auto_now_add=True)
+    acao = models.CharField("ação", max_length=5, choices=AcaoFicha.choices)
+
+    class Meta:
+        verbose_name = "acesso a ficha"
+        verbose_name_plural = "acessos a fichas"
+        ordering = ["-data_hora"]
+        indexes = [models.Index(fields=["acolhido", "-data_hora"])]
+
+    def __str__(self) -> str:
+        return f"{self.usuario_descricao} {self.get_acao_display().lower()} em {self.data_hora}"
+
+    @classmethod
+    def registrar(cls, usuario, acolhido, acao=AcaoFicha.VIEW):
+        return cls.objects.create(
+            usuario=usuario,
+            usuario_descricao=str(usuario),
+            acolhido=acolhido,
+            acao=acao,
+        )
