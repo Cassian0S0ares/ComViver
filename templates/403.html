@@ -1,0 +1,1 @@
+{% extends 'base.html' %}{% block titulo %}Acesso restrito{% endblock %}{% block conteudo %}<section class="error-state"><span class="error-code">403</span><h1>Seu perfil não tem acesso a esta página.</h1><p>Se precisar deste acesso, procure a coordenação.</p><a class="button button-primary" href="{% url 'core:painel' %}">Voltar ao painel</a></section>{% endblock %}

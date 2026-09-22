@@ -1,0 +1,1 @@
+<div class="messages" aria-live="polite" aria-atomic="true">{% for message in messages %}<div class="notice {% if message.tags == 'error' %}notice-danger{% else %}notice-success{% endif %}"><i class="bi {% if message.tags == 'error' %}bi-exclamation-circle{% else %}bi-check-circle{% endif %}" aria-hidden="true"></i><span>{{ message }}</span></div>{% endfor %}</div>

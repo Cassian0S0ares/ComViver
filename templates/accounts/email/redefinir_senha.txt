@@ -1,0 +1,12 @@
+{% autoescape off %}Olá{% if user.first_name %}, {{ user.first_name }}{% endif %}.
+
+Recebemos um pedido para criar uma nova senha para o seu acesso ao ComViver.
+
+Para continuar, abra o link abaixo. Ele vale por 1 hora e só pode ser usado uma vez:
+
+{{ protocol }}://{{ domain }}{% url 'accounts:redefinir_senha' uidb64=uid token=token %}
+
+Se não foi você quem pediu, ignore esta mensagem: sua senha atual continua valendo.
+
+Lar Padre José Gumercindo · ComViver
+{% endautoescape %}

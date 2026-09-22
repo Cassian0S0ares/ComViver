@@ -1,0 +1,8 @@
+-r base.txt
+pytest>=8.0,<10
+pytest-django>=4.9,<5
+factory-boy>=3.3,<4
+django-debug-toolbar>=4.4,<9
+ruff>=0.6,<1
+pre-commit>=3.8,<5
+playwright>=1.50,<2

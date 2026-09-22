@@ -1,0 +1,16 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "comviver.settings.test"
+python_files = ["test_*.py"]
+testpaths = ["accounts/tests", "core/tests", "tests"]
+addopts = "--reuse-db -q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+exclude = ["migrations", ".venv", ".venv312", ".tools", "docs", "static/vendor"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "DJ", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"comviver/settings/*.py" = ["F403", "F405"]

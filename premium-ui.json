@@ -1,0 +1,18 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["templates", "static/css", "static/js"],
+  "locale": "pt-BR",
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Select/Listbox", "Form", "Scrollbar", "Toast", "CRUD"],
+  "ownership": {"Select/Listbox": "native"},
+  "requiredCommands": ["unit", "lint", "design"],
+  "commands": {
+    "unit": "python -m pytest",
+    "lint": "ruff check .",
+    "design": "python scripts/check_design.py"
+  },
+  "evidence": {
+    "crudFullFlow": "accounts/tests/test_gestao_usuarios.py",
+    "failurePaths": "accounts/tests/test_seguranca.py"
+  }
+}

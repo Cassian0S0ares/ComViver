@@ -3296,25 +3296,6 @@ from acolhidos.models import (
 )
 
 # Dados ficticios. Nenhum nome, processo ou endereco corresponde a pessoa real.
-ACOLHIDOS = [
-    ("Ana Clara Ribeiro", "", 2015, 3, 10, Sexo.FEMININO),
-    ("Bruno Ribeiro", "", 2017, 7, 22, Sexo.MASCULINO),
-    ("Carla Mendes", "", 2012, 11, 5, Sexo.FEMININO),
-    ("Diego Alves", "", 2010, 1, 30, Sexo.MASCULINO),
-    ("Eduarda Pinto", "Duda", 2014, 6, 18, Sexo.FEMININO),
-    ("Felipe Castro", "", 2009, 9, 2, Sexo.MASCULINO),
-    ("Gabriela Nunes", "", 2016, 4, 25, Sexo.FEMININO),
-    ("Henrique Lopes", "", 2011, 12, 12, Sexo.MASCULINO),
-    ("Isabela Rocha", "", 2013, 8, 8, Sexo.FEMININO),
-]
-
-MOTIVOS = [
-    "Negligência familiar",
-    "Situação de rua",
-    "Violência doméstica",
-    "Abandono",
-    "Dependência química dos responsáveis",
-]
 
 ORGAOS = ["Conselho Tutelar", "Vara da Infância e Juventude", "Ministério Público"]
 
