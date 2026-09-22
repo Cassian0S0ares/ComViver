@@ -6,6 +6,7 @@ app_name = "acolhidos"
 
 urlpatterns = [
     path("acolhidos/", views.AcolhidoListView.as_view(), name="lista"),
+    path("medicacoes/", views.MedicacaoListView.as_view(), name="medicacoes"),
     path("acolhidos/novo/", views.AcolhimentoWizard.as_view(), name="novo"),
     path("acolhidos/<int:pk>/", views.AcolhidoDetailView.as_view(), name="detalhe"),
     path("acolhidos/<int:pk>/editar/", views.AcolhidoUpdateView.as_view(), name="editar"),

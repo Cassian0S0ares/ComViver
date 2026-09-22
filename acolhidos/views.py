@@ -4,6 +4,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.files.storage import FileSystemStorage
 from django.db import transaction
+from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
@@ -419,3 +420,71 @@ class MedicacaoRemoverView(PerfilRequiredMixin, View):
         _registrar_alteracao(request.user, self.acolhido)
         messages.success(request, f"{self.medicacao.nome} removido da ficha.")
         return redirect("acolhidos:detalhe", pk=self.acolhido.pk)
+
+
+SITUACOES_MEDICACAO = [
+    ("EM_USO", "Em uso hoje"),
+    ("ENCERRADAS", "Encerradas"),
+    ("TODAS", "Todas"),
+]
+
+
+class MedicacaoListView(BaseListView):
+    """Medicacoes da casa inteira, para o plantao consultar de uma vez.
+
+    Aberta a toda a equipe: e a lista de quem administra o remedio. Mostra
+    apenas crianca, medicamento, dose, horario e datas — nada da ficha
+    sigilosa (spec 5.1).
+    """
+
+    model = Medicacao
+    template_name = "acolhidos/medicacao_list.html"
+    context_object_name = "medicacoes"
+    campos_busca = ["nome", "acolhido__nome", "acolhido__nome_social"]
+    perfis_permitidos = TODOS_OS_PERFIS
+    paginate_by = 50
+
+    def _situacao(self) -> str:
+        situacao = self.request.GET.get("situacao", "EM_USO")
+        return situacao if situacao in dict(SITUACOES_MEDICACAO) else "EM_USO"
+
+    def _da_casa(self):
+        """Somente quem esta acolhido hoje: desligado nao entra no plantao."""
+        return Medicacao.objects.filter(
+            acolhido__status=StatusAcolhido.ACOLHIDO, acolhido__deleted_at__isnull=True
+        )
+
+    def _em_uso(self):
+        return self._da_casa().filter(pk__in=Medicacao.em_vigor.values("pk"))
+
+    def get_queryset(self):
+        # A busca por crianca ou medicamento ja vem da BaseListView.
+        qs = (
+            super()
+            .get_queryset()
+            .filter(acolhido__status=StatusAcolhido.ACOLHIDO, acolhido__deleted_at__isnull=True)
+        )
+        situacao = self._situacao()
+        if situacao == "EM_USO":
+            qs = qs.filter(pk__in=Medicacao.em_vigor.values("pk"))
+        elif situacao == "ENCERRADAS":
+            qs = qs.exclude(pk__in=Medicacao.em_vigor.values("pk"))
+        return qs.select_related("acolhido").order_by("acolhido__nome", "nome", "pk")
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        em_uso = self._em_uso()
+
+        # Quantas criancas tomam cada medicamento hoje. A mesma crianca com dois
+        # horarios do mesmo remedio conta uma vez.
+        contexto["resumo"] = [
+            {"nome": linha["nome"], "criancas": linha["criancas"]}
+            for linha in em_uso.values("nome")
+            .annotate(criancas=Count("acolhido", distinct=True))
+            .order_by("-criancas", "nome")
+        ]
+        contexto["total_criancas"] = em_uso.values("acolhido").distinct().count()
+        contexto["total_medicamentos"] = em_uso.values("nome").distinct().count()
+        contexto["situacao"] = self._situacao()
+        contexto["situacoes"] = SITUACOES_MEDICACAO
+        return contexto

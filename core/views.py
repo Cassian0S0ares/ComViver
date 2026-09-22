@@ -45,7 +45,7 @@ class PainelView(PerfilRequiredMixin, TemplateView):
                     ).count(),
                     "descricao": "em uso hoje",
                     "icone": "capsule",
-                    "url": reverse("acolhidos:lista"),
+                    "url": reverse("acolhidos:medicacoes"),
                 }
             )
 

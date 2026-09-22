@@ -28,6 +28,50 @@ document.querySelectorAll('[data-clear-search]').forEach(button => {
   input.addEventListener('input', () => { button.hidden = !input.value; });
   button.addEventListener('click', () => { input.value = ''; input.focus(); input.form.requestSubmit(); });
 });
+// Filtro sem botao: a tabela se atualiza enquanto a pessoa digita e ao mudar a
+// selecao. Quem filtra e o servidor, como no envio normal do formulario; so a
+// tabela e trocada, para nao recarregar a pagina nem tirar o foco do campo.
+// Sem JavaScript, o formulario continua funcionando pelo botao do noscript.
+document.querySelectorAll('[data-auto-filtrar]').forEach(form => {
+  const lista = document.querySelector('[data-lista]');
+  const contagem = document.querySelector('[data-contagem]');
+  const busca = form.querySelector('input[type=search]');
+  if (!lista) return;
+
+  let emCurso;
+  let espera;
+
+  const atualizar = async () => {
+    const parametros = new URLSearchParams(new FormData(form));
+    const destino = `${location.pathname}?${parametros}`;
+    emCurso?.abort();
+    const controle = new AbortController();
+    emCurso = controle;
+    lista.setAttribute('aria-busy', 'true');
+    try {
+      const resposta = await fetch(destino, { signal: controle.signal });
+      if (!resposta.ok) throw new Error(resposta.status);
+      const pagina = new DOMParser().parseFromString(await resposta.text(), 'text/html');
+      lista.innerHTML = pagina.querySelector('[data-lista]').innerHTML;
+      if (contagem) contagem.textContent = pagina.querySelector('[data-contagem]').textContent;
+      history.replaceState(null, '', destino);
+    } catch (erro) {
+      // Rede fora ou resposta inesperada: cai no envio normal do formulario.
+      if (erro.name !== 'AbortError') form.submit();
+    } finally {
+      lista.removeAttribute('aria-busy');
+    }
+  };
+
+  form.addEventListener('submit', event => { event.preventDefault(); atualizar(); });
+  form.querySelectorAll('select').forEach(select => {
+    select.addEventListener('change', atualizar);
+  });
+  busca?.addEventListener('input', () => {
+    clearTimeout(espera);
+    espera = setTimeout(atualizar, 250);
+  });
+});
 document.querySelectorAll('[data-dialog-close]').forEach(button => {
   button.addEventListener('click', () => button.closest('dialog').close());
 });
