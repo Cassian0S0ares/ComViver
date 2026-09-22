@@ -118,6 +118,10 @@ STORAGES = {
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Arquivos enviados no meio do assistente de acolhimento, antes de o cadastro
+# ser concluido. Fica fora de MEDIA_ROOT para nunca ser servido pela rota /media/.
+ASSISTENTE_TEMP_DIR = BASE_DIR / ".assistente"
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 LOGIN_URL = "accounts:login"
