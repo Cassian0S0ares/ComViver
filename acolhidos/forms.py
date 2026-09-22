@@ -91,7 +91,6 @@ class EtapaAcolhimentoForm(FormularioAcolhidos, forms.ModelForm):
             "orgao_requisitante",
             "processo_numero",
             "vara",
-            "medida_protetiva",
         ]
 
     def clean_data_entrada(self):
@@ -105,7 +104,6 @@ class EtapaSaudeEscolaForm(FormularioAcolhidos, forms.ModelForm):
     escola = forms.CharField(label="Escola", max_length=150, required=False)
     serie = forms.CharField(label="Série", max_length=50, required=False)
     turno = forms.ChoiceField(label="Turno", required=False, choices=[("", "—"), *Turno.choices])
-    ano_letivo = forms.IntegerField(label="Ano letivo", required=False, min_value=2000)
 
     class Meta:
         model = DadosSaude
@@ -113,8 +111,6 @@ class EtapaSaudeEscolaForm(FormularioAcolhidos, forms.ModelForm):
 
     def clean(self):
         dados = super().clean()
-        if dados.get("escola") and not dados.get("ano_letivo"):
-            self.add_error("ano_letivo", "Informe o ano letivo da escola.")
         if dados.get("escola") and not dados.get("serie"):
             self.add_error("serie", "Informe a série da escola.")
         return dados

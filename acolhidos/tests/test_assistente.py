@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 
+from acolhidos.factories import AcolhidoFactory
 from acolhidos.models import Acolhido, FichaAcolhimento, VinculoFamiliar
 
 pytestmark = pytest.mark.django_db
@@ -30,7 +31,6 @@ DADOS_ACOLHIMENTO = {
     "acolhimento-orgao_requisitante": "Conselho Tutelar",
     "acolhimento-processo_numero": "0001234-56.2026.8.13.0301",
     "acolhimento-vara": "Vara da Infância",
-    "acolhimento-medida_protetiva": "Acolhimento institucional",
 }
 
 DADOS_SAUDE = {
@@ -42,7 +42,6 @@ DADOS_SAUDE = {
     "saude-escola": "E.E. Dom Pedro",
     "saude-serie": "4º ano",
     "saude-turno": "MANHA",
-    "saude-ano_letivo": "2026",
 }
 
 DADOS_RESPONSAVEL = {
@@ -83,6 +82,16 @@ class TestAcessoAoAssistente:
 
 
 class TestFluxoCompleto:
+    def test_formulario_nao_exibe_campos_removidos(self, client, usuario_tecnico):
+        client.force_login(usuario_tecnico)
+        etapa_saude = client.get(URL, {"step": "saude"}).content.decode()
+        detalhe = client.get(f"/acolhidos/{AcolhidoFactory().pk}/").content.decode()
+
+        assert "Medida protetiva" not in etapa_saude
+        assert "Ano letivo" not in etapa_saude
+        assert "Medida protetiva" not in detalhe
+        assert "Ano letivo" not in detalhe
+
     def test_percorrer_as_quatro_etapas_cria_o_acolhido(self, client, usuario_tecnico):
         client.force_login(usuario_tecnico)
         resposta = percorrer(client)

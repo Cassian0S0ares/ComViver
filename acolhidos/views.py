@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.conf import settings
 from django.contrib import messages
 from django.core.files.storage import FileSystemStorage
@@ -173,7 +175,7 @@ class AcolhimentoWizard(PerfilRequiredMixin, SessionWizardView):
                 escola=etapa_saude.cleaned_data["escola"],
                 serie=etapa_saude.cleaned_data.get("serie", ""),
                 turno=etapa_saude.cleaned_data.get("turno", ""),
-                ano_letivo=etapa_saude.cleaned_data["ano_letivo"],
+                ano_letivo=date.today().year,
                 criado_por=self.request.user,
             )
 
