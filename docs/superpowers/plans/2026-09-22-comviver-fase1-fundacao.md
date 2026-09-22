@@ -26,12 +26,20 @@ Valem para todas as tarefas, sem repetição em cada uma:
 
 ## Conexão com o banco
 
-Duas conexões do mesmo projeto Supabase, com papéis distintos (spec §3.4):
+Uma única conexão, declarada em `DATABASE_URL`, usada para tudo: aplicação,
+migrations e testes.
 
-| Uso | Variável | Porta | Quando |
-|---|---|---|---|
-| Aplicação | `DATABASE_URL` | 6543 | Execução normal e testes |
+```
+DATABASE_URL=postgres://USUARIO:SENHA@HOST:5432/postgres
+```
 
+**Use a conexão direta, porta 5432 — não o pooler (6543).** O transaction pooler
+do Supabase não suporta cursor nomeado nem DDL longo, então `migrate` e consultas
+grandes falham nele. A conexão direta atende os dois casos, e o volume de uma
+instituição desse porte fica muito abaixo do limite de conexões simultâneas.
+
+Nenhum comando precisa alternar variável de ambiente: `python manage.py migrate`
+funciona direto.
 
 ---
 
@@ -131,7 +139,7 @@ Cria o esqueleto e prova que a conexão com o Supabase funciona. Sem isso, nada 
 
 **Interfaces:**
 - Consumes: nada
-- Produces: pacote `comviver.settings.base` com `INSTALLED_APPS`, `DATABASES`, `TEMPLATES`, `AUTH_USER_MODEL` (definido na Task 4); variável de ambiente `USE_DIRECT_DB` que alterna a conexão
+- Produces: pacote `comviver.settings.base` com `INSTALLED_APPS`, `DATABASES`, `TEMPLATES`, `AUTH_USER_MODEL` (definido na Task 4); conexão única lida de `DATABASE_URL`
 
 - [ ] **Step 1: Criar ambiente virtual e arquivos de dependência**
 
@@ -197,7 +205,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 env = environ.Env(
     DEBUG=(bool, False),
-    USE_DIRECT_DB=(bool, False),
     ALLOWED_HOSTS=(list, []),
 )
 environ.Env.read_env(BASE_DIR / ".env")
@@ -248,15 +255,13 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "comviver.wsgi.application"
 
-# Migrations usam a conexao direta (porta 5432); a aplicacao usa o pooler (6543).
-_db_url = env("DIRECT_URL") if env("USE_DIRECT_DB") else env("DATABASE_URL")
-
+# Conexao direta (porta 5432), usada pela aplicacao, pelas migrations e pelos
+# testes. O transaction pooler do Supabase nao suporta DDL longo nem cursor
+# nomeado, entao nao serve como conexao unica.
 DATABASES = {
     "default": {
-        **env.db_url_config(_db_url),
-        # O pooler em transaction mode gerencia o pool e nao suporta cursor nomeado.
-        "CONN_MAX_AGE": 0,
-        "DISABLE_SERVER_SIDE_CURSORS": True,
+        **env.db_url_config(env("DATABASE_URL")),
+        "CONN_MAX_AGE": 60,
         "OPTIONS": {"sslmode": "require"},
     }
 }
@@ -291,9 +296,26 @@ LOGIN_URL = "accounts:login"
 LOGIN_REDIRECT_URL = "core:painel"
 LOGOUT_REDIRECT_URL = "accounts:login"
 
-# Computador compartilhado na recepcao: sessao expira por inatividade.
+# Computador compartilhado na recepcao: sessao expira por inatividade e ao
+# fechar o navegador. Sem a segunda regra, quem fechasse a aba sem sair
+# deixaria a sessao viva para a proxima pessoa que sentasse na maquina.
 SESSION_COOKIE_AGE = 60 * 60
 SESSION_SAVE_EVERY_REQUEST = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+
+# Nao vaza o endereco da ficha aberta para sites externos pelo cabecalho
+# Referer — uma URL como /acolhidos/12/ ja e informacao.
+SECURE_REFERRER_POLICY = "same-origin"
+
+# Limita o tamanho do corpo da requisicao. O limite por arquivo esta em
+# core.uploads; este cobre o total enviado de uma vez.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 500
 ```
 
 - [ ] **Step 4: Escrever `dev.py` e `prod.py`**
@@ -323,6 +345,23 @@ SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Origens autorizadas a enviar formulario. Sem isso, o Django recusa POST
+# vindo do proprio dominio quando ha proxy HTTPS na frente.
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])  # noqa: F405
+
+# Falha cedo: DEBUG ligado em producao exibiria a senha do banco na pagina de
+# erro, e SECRET_KEY de exemplo invalidaria toda sessao e token CSRF.
+if DEBUG:
+    raise RuntimeError("DEBUG não pode estar ligado em produção.")
+if not ALLOWED_HOSTS:  # noqa: F405
+    raise RuntimeError("Defina ALLOWED_HOSTS antes de publicar.")
+```
+
+Acrescentar a variável ao `.env.example`:
+```
+# Apenas em producao. Ex.: https://comviver.exemplo.org
+CSRF_TRUSTED_ORIGINS=
 ```
 
 - [ ] **Step 5: Escrever `.env.example`**
@@ -333,14 +372,9 @@ SECRET_KEY=
 DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 
-# Aplicacao — pooler, porta 6543
-DATABASE_URL=postgres://USUARIO:SENHA@HOST_POOLER:6543/postgres
-
-# Migrations — conexao direta, porta 5432
-DIRECT_URL=postgres://USUARIO:SENHA@HOST_DIRETO:5432/postgres
-
-# Alterna para DIRECT_URL. Usado apenas ao rodar migrations.
-USE_DIRECT_DB=False
+# Conexao direta com o banco, porta 5432. Nao use o pooler (6543):
+# ele nao suporta migrations nem consultas grandes.
+DATABASE_URL=postgres://USUARIO:SENHA@HOST:5432/postgres
 ```
 
 Criar o `.env` real localmente com os valores do Supabase. Gerar a chave:
@@ -356,15 +390,14 @@ python manage.py check
 ```
 Esperado: `System check identified no issues (0 silenced).`
 
-PowerShell, testando a conexão direta:
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 ```
 Esperado: as migrations do Django (`auth`, `contenttypes`, `sessions`, `admin`) aplicam sem erro.
 
-Se aparecer `SSL connection has been closed unexpectedly`, a porta está errada — `migrate` exige a 5432.
+Se aparecer `SSL connection has been closed unexpectedly` ou
+`prepared statement already exists`, a `DATABASE_URL` está apontando para o
+pooler. Troque para a conexão direta, porta 5432.
 
 - [ ] **Step 7: Escrever o `README.md`**
 
@@ -393,14 +426,13 @@ Preencha o `.env` com as credenciais do banco e uma `SECRET_KEY` gerada por:
 python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
 ```
 
+A `DATABASE_URL` precisa apontar para a **conexão direta** do PostgreSQL
+(porta 5432). O pooler em modo transação não suporta migrations.
+
 ## Migrations
 
-Migrations usam a conexão direta do banco, não o pooler:
-
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 ```
 
 ## Executar
@@ -510,7 +542,18 @@ Estes models importam de `core.models`, criado na Task 3. Até lá a suíte não
 - [ ] **Step 3: Escrever `comviver/settings/test.py`**
 
 ```python
+import sys
+
 from .base import *  # noqa: F403
+
+# Este settings so pode ser carregado pela suite de testes. Sem a trava, um
+# erro de digitacao no DJANGO_SETTINGS_MODULE do servidor colocaria o sistema
+# no ar com hash de senha em MD5 e bloqueio de login desativado.
+if "pytest" not in sys.modules:
+    raise RuntimeError(
+        "comviver.settings.test é exclusivo da suíte de testes. "
+        "Use comviver.settings.dev ou comviver.settings.prod."
+    )
 
 INSTALLED_APPS += ["tests.testapp"]  # noqa: F405
 
@@ -1010,20 +1053,16 @@ Em `comviver/settings/base.py`, após `DEFAULT_AUTO_FIELD`:
 AUTH_USER_MODEL = "accounts.Usuario"
 ```
 
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py makemigrations accounts
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 ```
 
 Se o banco já tiver tabelas de `auth` da Task 1, o Django recusa a troca de usuário. Nesse caso, zerar o banco de desenvolvimento — não há dado real ainda:
 
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py migrate accounts zero
 # se persistir, apagar o schema public pelo painel do Supabase e rodar migrate de novo
-$env:USE_DIRECT_DB = ""
 ```
 
 - [ ] **Step 5: Escrever a factory e as fixtures**
@@ -1240,10 +1279,8 @@ O `get_or_create` evita quebra em banco de teste criado antes da migration rodar
 
 - [ ] **Step 5: Aplicar a migration e rodar os testes**
 
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 ```
 
 ```bash
@@ -1489,6 +1526,90 @@ class TestTrocaSenhaObrigatoria:
 pytest accounts/tests/test_login.py -v
 ```
 Esperado: `NoReverseMatch: 'accounts' is not a registered namespace`.
+
+- [ ] **Step 2b: Instalar o bloqueio de tentativas de login**
+
+Sem limite de tentativas, uma senha fraca cai por força bruta em minutos — e
+aqui isso dá acesso à ficha de crianças acolhidas. `django-axes` resolve com
+configuração, sem código próprio, e traz uma tela no admin para a coordenação
+desbloquear quem se trancou fora.
+
+Acrescentar a `requirements/base.txt`:
+```
+django-axes[ipware]>=6.5,<8.0
+```
+
+```bash
+pip install -r requirements/dev.txt
+```
+
+Em `comviver/settings/base.py`:
+```python
+INSTALLED_APPS = [
+    # ...
+    "axes",
+    "core",
+    "accounts",
+]
+
+MIDDLEWARE = [
+    # ... (axes fica por ultimo)
+    "axes.middleware.AxesMiddleware",
+]
+
+AUTHENTICATION_BACKENDS = [
+    "axes.backends.AxesStandaloneBackend",   # precisa vir primeiro
+    "django.contrib.auth.backends.ModelBackend",
+]
+
+# Cinco tentativas erradas bloqueiam o usuario por 30 minutos. O bloqueio
+# considera usuario e IP juntos: bloquear so por IP deixaria a recepcao inteira
+# de fora quando uma pessoa errasse a senha, porque todos saem pelo mesmo IP.
+AXES_FAILURE_LIMIT = 5
+AXES_COOLOFF_TIME = 0.5
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+AXES_RESET_ON_SUCCESS = True
+AXES_LOCKOUT_TEMPLATE = "accounts/bloqueado.html"
+```
+
+Em `comviver/settings/test.py`, desligar para não interferir nos testes que
+fazem vários logins seguidos:
+```python
+AXES_ENABLED = False
+```
+
+E um teste próprio para a trava, em `accounts/tests/test_login.py`:
+```python
+class TestBloqueioPorTentativas:
+    def test_bloqueia_apos_cinco_erros(self, client, settings):
+        """Sem essa trava, senha fraca cai por forca bruta — e o acesso obtido
+        alcanca a ficha de criancas acolhidas."""
+        settings.AXES_ENABLED = True
+        UsuarioFactory(username="maria", password="senha-de-teste-123")
+
+        for _ in range(5):
+            client.post(
+                reverse("accounts:login"), {"username": "maria", "password": "errada"}
+            )
+
+        resposta = client.post(
+            reverse("accounts:login"),
+            {"username": "maria", "password": "senha-de-teste-123"},
+        )
+        assert resposta.status_code in (403, 429)
+```
+
+Criar `templates/accounts/bloqueado.html` seguindo o layout da tela de login,
+com a mensagem:
+```html
+    <div class="alert alert-danger">
+      <strong>Acesso bloqueado temporariamente.</strong>
+      <p class="mb-0 small">
+        Foram feitas várias tentativas com senha incorreta. Aguarde 30 minutos
+        ou procure a coordenação.
+      </p>
+    </div>
+```
 
 - [ ] **Step 3: Escrever `accounts/forms.py`**
 
@@ -1776,7 +1897,7 @@ acesso à internet.
               <label for="{{ campo.id_for_label }}" class="form-label">{{ campo.label }}</label>
               {{ campo }}
               {% if campo.help_text %}
-                <div class="form-text">{{ campo.help_text|safe }}</div>
+                <div class="form-text">{{ campo.help_text }}</div>
               {% endif %}
               {% for erro in campo.errors %}
                 <div class="form-text text-danger">{{ erro }}</div>

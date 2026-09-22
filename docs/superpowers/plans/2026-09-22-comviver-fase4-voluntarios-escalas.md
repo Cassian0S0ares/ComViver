@@ -305,6 +305,7 @@ from datetime import date
 from django.db import models
 
 from core.models import Endereco, SoftDeleteModel
+from core.uploads import caminho_opaco, validar_documento
 
 
 class StatusVoluntario(models.TextChoices):
@@ -442,7 +443,11 @@ class DocumentoVoluntario(SoftDeleteModel):
     voluntario = models.ForeignKey(
         Voluntario, on_delete=models.CASCADE, related_name="documentos"
     )
-    arquivo = models.FileField("arquivo", upload_to="voluntarios/documentos/")
+    arquivo = models.FileField(
+        "arquivo",
+        upload_to=caminho_opaco("voluntarios/documentos"),
+        validators=[validar_documento],
+    )
     tipo = models.CharField("tipo", max_length=80)
 
     class Meta:
@@ -953,11 +958,9 @@ Em `core/context_processors.py`:
 
 - [ ] **Step 8: Gerar migration e rodar os testes**
 
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py makemigrations voluntarios
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 ```
 
 ```bash
@@ -1477,11 +1480,9 @@ class AlocacaoFactory(factory.django.DjangoModelFactory):
 
 - [ ] **Step 5: Gerar migration e rodar**
 
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py makemigrations escalas
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 ```
 
 ```bash
@@ -1629,6 +1630,40 @@ class TestTelaDaGrade:
         )
         assert "já está escalada" in resposta.content.decode()
         assert Alocacao.objects.filter(turno=novo).count() == 0
+
+    def test_mensagem_de_conflito_escapa_o_nome(self, client, usuario_operacional):
+        """O nome do voluntario entra na mensagem de erro. Sem escape, um nome
+        com marcacao viraria XSS refletido em quem monta a escala."""
+        hoje = date.today()
+        escala = EscalaFactory()
+        voluntario = VoluntarioFactory(nome="<script>alert(1)</script>")
+        ocupado = TurnoFactory(
+            escala=escala, data=hoje, hora_inicio=time(8, 0), hora_fim=time(12, 0)
+        )
+        AlocacaoFactory(turno=ocupado, voluntario=voluntario)
+        novo = TurnoFactory(
+            escala=escala, data=hoje, hora_inicio=time(10, 0), hora_fim=time(14, 0)
+        )
+
+        client.force_login(usuario_operacional)
+        resposta = client.post(
+            reverse("escalas:alocar", args=[novo.pk]), {"voluntario": voluntario.pk}
+        )
+        conteudo = resposta.content.decode()
+        assert "<script>alert(1)</script>" not in conteudo
+        assert "&lt;script&gt;" in conteudo
+
+    def test_alocar_voluntario_inativo_e_recusado(self, client, usuario_operacional):
+        from voluntarios.models import StatusVoluntario
+
+        turno = TurnoFactory()
+        inativo = VoluntarioFactory(status=StatusVoluntario.INATIVO)
+        client.force_login(usuario_operacional)
+        resposta = client.post(
+            reverse("escalas:alocar", args=[turno.pk]), {"voluntario": inativo.pk}
+        )
+        assert resposta.status_code == 404
+        assert not Alocacao.objects.filter(turno=turno).exists()
 
     def test_desalocar_remove_a_alocacao(self, client, usuario_operacional):
         alocacao = AlocacaoFactory()
@@ -1865,6 +1900,7 @@ from core.views import BaseCreateView, BaseListView
 from escalas.forms import EscalaForm, TurnoForm
 from escalas.models import Alocacao, Escala, StatusEscala, Turno
 from escalas.services import grade_da_escala, voluntarios_disponiveis
+from voluntarios.models import StatusVoluntario, Voluntario
 
 TODOS_OS_PERFIS = [Perfil.ADMIN, Perfil.TECNICO, Perfil.OPERACIONAL]
 QUEM_MONTA = [Perfil.ADMIN, Perfil.OPERACIONAL]
@@ -1957,15 +1993,23 @@ class AlocarView(PerfilRequiredMixin, View):
 
     def post(self, request, pk):
         turno = get_object_or_404(Turno, pk=pk)
-        alocacao = Alocacao(turno=turno, voluntario_id=request.POST.get("voluntario"))
+
+        voluntario = get_object_or_404(
+            Voluntario, pk=request.POST.get("voluntario"), status=StatusVoluntario.ATIVO
+        )
+        alocacao = Alocacao(turno=turno, voluntario=voluntario)
 
         try:
             alocacao.full_clean()
         except ValidationError as erro:
             mensagens = [m for lista in erro.message_dict.values() for m in lista]
-            return HttpResponse(
-                f'<div class="alert alert-warning py-1 px-2 small mb-0">'
-                f'{" ".join(mensagens)}</div>',
+            # Renderiza por template: a mensagem contem o nome do voluntario,
+            # que e dado de entrada. Montar o HTML com f-string entregaria XSS
+            # refletido a quem conseguisse cadastrar um nome com marcacao.
+            return render(
+                request,
+                "escalas/partials/_erro_alocacao.html",
+                {"mensagens": mensagens},
                 status=200,
             )
 
@@ -2081,6 +2125,17 @@ Em `comviver/urls.py`:
   {% endif %}
 </div>
 ```
+
+`templates/escalas/partials/_erro_alocacao.html`:
+```html
+<div class="alert alert-warning py-1 px-2 small mb-0">
+  {% for mensagem in mensagens %}{{ mensagem }} {% endfor %}
+</div>
+```
+
+O template existe para que o escape automático do Django trate as mensagens. A
+mensagem de conflito inclui o nome do voluntário, que é dado digitado por um
+usuário.
 
 `templates/escalas/partials/_lista_disponiveis.html`:
 ```html
@@ -2711,10 +2766,8 @@ ruff format --check .
 
 - [ ] **Step 8: Verificação manual**
 
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 python manage.py seed_demo --limpar
 python manage.py runserver
 ```

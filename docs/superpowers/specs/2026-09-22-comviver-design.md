@@ -113,26 +113,24 @@ O ambiente de desenvolvimento usa um projeto Supabase (região `sa-east-1`). A
 produção usará o banco da hospedagem contratada. Como ambos são PostgreSQL, a
 migração é uma troca de valor de variável, não uma refatoração.
 
-**Conexão com Supabase — duas portas, dois papéis:**
-
-| Uso | Variável | Porta | Observação |
-|---|---|---|---|
-| Aplicação em execução | `DATABASE_URL` | 6543 | Transaction pooler (PgBouncer) |
-| Migrations | `DIRECT_URL` | 5432 | Conexão direta |
-
-O transaction pooler exige dois ajustes no Django, sem os quais consultas
-grandes falham:
+**Conexão única.** Uma variável, `DATABASE_URL`, apontando para a conexão direta
+do PostgreSQL (porta 5432). Ela atende aplicação, migrations e testes.
 
 ```python
 DATABASES = {
     "default": {
-        **env.db("DATABASE_URL"),
-        "CONN_MAX_AGE": 0,                     # o pooler gerencia o pool
-        "DISABLE_SERVER_SIDE_CURSORS": True,   # transaction mode não suporta cursor nomeado
-        "OPTIONS": {"sslmode": "require"},     # Supabase recusa conexão sem SSL
+        **env.db_url_config(env("DATABASE_URL")),
+        "CONN_MAX_AGE": 60,
+        "OPTIONS": {"sslmode": "require"},   # Supabase recusa conexão sem SSL
     }
 }
 ```
+
+O transaction pooler do Supabase (porta 6543) **não** é usado. Ele não suporta
+DDL longo nem cursor nomeado, o que quebra `migrate` e consultas grandes, e
+exigiria uma segunda variável só para as migrations. O volume de uma instituição
+desse porte fica muito abaixo do limite de conexões diretas simultâneas, então o
+pooler não traz benefício que justifique a complexidade.
 
 ---
 
@@ -299,11 +297,37 @@ registro.
 - Arquivos enviados (foto, documento) não ficam em diretório público. São
   servidos por uma view que verifica permissão. Caso contrário, quem descobrisse
   a URL veria a foto de uma criança acolhida sem autenticação.
-- Sessão expira por inatividade, pois o computador da recepção é compartilhado.
-- `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE` e `CSRF_COOKIE_SECURE` ativos
-  em produção.
+- O nome original do arquivo enviado é descartado e substituído por um
+  identificador aleatório. O nome vira parte da URL, e um arquivo chamado
+  `ana-clara-souza.jpg` identificaria a criança sem que ninguém abrisse a ficha.
+- Uploads aceitam apenas formatos declarados, com limite de tamanho. SVG fica
+  de fora: é XML executável, e um SVG aceito como foto viraria script rodando
+  na origem do sistema.
+- Arquivo que o navegador poderia executar sai como download, com `nosniff`.
+- Sessão expira por inatividade e ao fechar o navegador, pois o computador da
+  recepção é compartilhado.
+- Cinco tentativas de login incorretas bloqueiam usuário e IP por 30 minutos.
+  Sem isso, senha fraca cai por força bruta, e o acesso obtido alcança a ficha
+  das crianças.
+- `SECURE_SSL_REDIRECT`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, HSTS e
+  `SECURE_REFERRER_POLICY` ativos em produção.
 - Validadores de senha do Django; troca obrigatória no primeiro acesso.
 - Exclusão sempre lógica; apenas o Admin acessa a lixeira.
+- Comandos que apagam dados (`seed_demo --limpar`) recusam rodar com
+  `DEBUG=False` sem confirmação explícita.
+- O arquivo de backup é tratado como documento sigiloso: contém a ficha de cada
+  acolhido e os hashes de senha.
+
+### 5.6 Riscos aceitos
+
+Registrados por decisão, não por esquecimento:
+
+| Risco | Por que é aceito |
+|---|---|
+| `/admin/` em endereço previsível | Restrito a superusuário e protegido pelo bloqueio de tentativas. Mover a URL é ofuscação, não proteção. |
+| Foto do acolhido visível a qualquer perfil autenticado | O Operacional precisa reconhecer a criança. O que ele não pode ver é a ficha. |
+| Backup sem criptografia em repouso | Cifrar exigiria gestão de chave que a instituição não tem como sustentar; a proteção vem da ACL da pasta e do procedimento documentado. |
+| Sem registro de IP no log de acesso à ficha | A instituição opera em rede única; o IP não distinguiria pessoas. O usuário autenticado já identifica quem acessou. |
 
 ### 5.5 LGPD
 

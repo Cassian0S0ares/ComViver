@@ -348,18 +348,11 @@ class BaseUpdateView(PerfilRequiredMixin, _SalvarComAutorMixin, UpdateView):
 
 - [ ] **Step 6: Gerar a migration do model de teste e rodar**
 
-```powershell
+`testapp` só existe em `comviver/settings/test.py`, então o comando precisa
+apontar para esse settings:
 
-python manage.py makemigrations testapp
-
-```
-
-Nota: `testapp` só existe em `comviver/settings/test.py`. Para gerar a migration, rodar o comando com `DJANGO_SETTINGS_MODULE=comviver.settings.test`:
-
-```powershell
-$env:DJANGO_SETTINGS_MODULE = "comviver.settings.test"
-python manage.py makemigrations testapp
-$env:DJANGO_SETTINGS_MODULE = ""
+```bash
+python manage.py makemigrations testapp --settings=comviver.settings.test
 ```
 
 ```bash
@@ -547,6 +540,7 @@ from django.db import models
 from simple_history.models import HistoricalRecords
 
 from core.models import Endereco, SoftDeleteModel
+from core.uploads import caminho_opaco, validar_documento, validar_imagem
 
 
 class StatusAcolhido(models.TextChoices):
@@ -575,7 +569,12 @@ class Acolhido(SoftDeleteModel):
     nascimento = models.DateField("data de nascimento")
     sexo = models.CharField("sexo", max_length=1, choices=Sexo.choices)
     naturalidade = models.CharField("naturalidade", max_length=100, blank=True)
-    foto = models.ImageField("foto", upload_to="acolhidos/fotos/", blank=True)
+    foto = models.ImageField(
+        "foto",
+        upload_to=caminho_opaco("acolhidos/fotos"),
+        validators=[validar_imagem],
+        blank=True,
+    )
 
     cpf = models.CharField("CPF", max_length=11, blank=True, unique=True, null=True)
     rg = models.CharField("RG", max_length=20, blank=True)
@@ -730,11 +729,9 @@ class VinculoFamiliarFactory(factory.django.DjangoModelFactory):
 
 - [ ] **Step 6: Gerar migration e rodar os testes**
 
-```powershell
-
+```bash
 python manage.py makemigrations acolhidos
 python manage.py migrate
-
 ```
 
 ```bash
@@ -747,6 +744,181 @@ Esperado: 12 testes passando.
 ```bash
 git add acolhidos comviver/settings/base.py requirements/base.txt
 git commit -m "feat(acolhidos): adiciona Acolhido, Responsavel e VinculoFamiliar"
+```
+
+---
+
+## Task 2b: Upload seguro de arquivos
+
+Escrito antes dos models que têm campo de arquivo. Três problemas a resolver de
+uma vez, para acolhidos, voluntários e configuração.
+
+**Files:**
+- Create: `core/uploads.py`
+- Create: `core/tests/test_uploads.py`
+- Modify: `acolhidos/models.py` (aplicar aos campos de arquivo)
+
+**Interfaces:**
+- Consumes: nada
+- Produces:
+  - `core.uploads.caminho_opaco(prefixo: str)` — fábrica de `upload_to` que gera nome aleatório
+  - `core.uploads.validar_imagem`, `core.uploads.validar_documento` — validadores de extensão e tamanho
+  - `core.uploads.TAMANHO_MAXIMO_MB`
+
+- [ ] **Step 1: Escrever os testes que falham**
+
+`core/tests/test_uploads.py`:
+```python
+import pytest
+from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
+
+from core.uploads import caminho_opaco, validar_documento, validar_imagem
+
+
+class TestCaminhoOpaco:
+    def test_descarta_o_nome_original(self):
+        """O nome do arquivo vira parte da URL. 'ana-clara-souza.jpg'
+        identificaria a crianca sem ninguem abrir a ficha — o que o art. 143
+        do ECA veda."""
+        gerar = caminho_opaco("acolhidos/fotos")
+        caminho = gerar(None, "ana-clara-souza.jpg")
+        assert "ana" not in caminho.lower()
+        assert caminho.startswith("acolhidos/fotos/")
+        assert caminho.endswith(".jpg")
+
+    def test_dois_envios_geram_caminhos_diferentes(self):
+        gerar = caminho_opaco("acolhidos/fotos")
+        assert gerar(None, "foto.jpg") != gerar(None, "foto.jpg")
+
+    def test_extensao_e_normalizada(self):
+        gerar = caminho_opaco("acolhidos/fotos")
+        assert gerar(None, "FOTO.JPEG").endswith(".jpeg")
+
+    def test_extensao_perigosa_nao_sobrevive(self):
+        gerar = caminho_opaco("acolhidos/documentos")
+        caminho = gerar(None, "malicioso.php")
+        assert not caminho.endswith(".php")
+        assert caminho.endswith(".bin")
+
+
+class TestValidadores:
+    def test_imagem_aceita_jpg(self):
+        validar_imagem(SimpleUploadedFile("foto.jpg", b"x" * 100, "image/jpeg"))
+
+    def test_imagem_recusa_svg(self):
+        """SVG e XML executavel: aceito, viraria XSS armazenado."""
+        arquivo = SimpleUploadedFile("mapa.svg", b"<svg/>", "image/svg+xml")
+        with pytest.raises(ValidationError):
+            validar_imagem(arquivo)
+
+    def test_imagem_recusa_html(self):
+        arquivo = SimpleUploadedFile("pagina.html", b"<html>", "text/html")
+        with pytest.raises(ValidationError):
+            validar_imagem(arquivo)
+
+    def test_documento_aceita_pdf(self):
+        validar_documento(SimpleUploadedFile("doc.pdf", b"%PDF", "application/pdf"))
+
+    def test_documento_recusa_executavel(self):
+        arquivo = SimpleUploadedFile("programa.exe", b"MZ", "application/octet-stream")
+        with pytest.raises(ValidationError):
+            validar_documento(arquivo)
+
+    def test_recusa_arquivo_grande_demais(self):
+        from core.uploads import TAMANHO_MAXIMO_MB
+
+        grande = SimpleUploadedFile(
+            "foto.jpg", b"x" * (TAMANHO_MAXIMO_MB * 1024 * 1024 + 1), "image/jpeg"
+        )
+        with pytest.raises(ValidationError) as erro:
+            validar_imagem(grande)
+        assert "MB" in str(erro.value)
+
+    def test_mensagem_de_erro_em_portugues(self):
+        arquivo = SimpleUploadedFile("mapa.svg", b"<svg/>", "image/svg+xml")
+        with pytest.raises(ValidationError) as erro:
+            validar_imagem(arquivo)
+        assert "não é aceito" in str(erro.value)
+```
+
+- [ ] **Step 2: Rodar e confirmar a falha**
+
+```bash
+pytest core/tests/test_uploads.py -v
+```
+Esperado: `ModuleNotFoundError: No module named 'core.uploads'`.
+
+- [ ] **Step 3: Escrever `core/uploads.py`**
+
+```python
+import uuid
+from pathlib import Path
+
+from django.core.exceptions import ValidationError
+
+TAMANHO_MAXIMO_MB = 10
+
+EXTENSOES_IMAGEM = {".jpg", ".jpeg", ".png", ".webp"}
+EXTENSOES_DOCUMENTO = EXTENSOES_IMAGEM | {".pdf", ".odt", ".docx"}
+
+
+def caminho_opaco(prefixo: str):
+    """Fabrica de `upload_to` que descarta o nome original do arquivo.
+
+    O nome enviado vira parte da URL publica do arquivo. Um arquivo chamado
+    'ana-clara-souza.jpg' identificaria a crianca sem que ninguem abrisse a
+    ficha — exatamente o que o art. 143 do ECA veda. Alem disso, nome original
+    permite colisao e carrega caracteres que o sistema de arquivos rejeita.
+    """
+
+    def gerar(instance, nome_original: str) -> str:
+        extensao = Path(nome_original).suffix.lower()
+        if extensao not in EXTENSOES_DOCUMENTO:
+            extensao = ".bin"
+        return f"{prefixo}/{uuid.uuid4().hex}{extensao}"
+
+    return gerar
+
+
+def _validar(arquivo, permitidas: set[str]):
+    extensao = Path(arquivo.name).suffix.lower()
+    if extensao not in permitidas:
+        aceitas = ", ".join(sorted(permitidas))
+        raise ValidationError(
+            f"O formato {extensao or 'desconhecido'} não é aceito. "
+            f"Envie um arquivo {aceitas}."
+        )
+
+    if arquivo.size > TAMANHO_MAXIMO_MB * 1024 * 1024:
+        raise ValidationError(
+            f"O arquivo tem {arquivo.size / 1024 / 1024:.1f} MB. "
+            f"O limite é {TAMANHO_MAXIMO_MB} MB."
+        )
+
+
+def validar_imagem(arquivo):
+    """SVG fica de fora de proposito: e XML executavel, e um SVG aceito como
+    foto viraria script rodando na origem do sistema."""
+    _validar(arquivo, EXTENSOES_IMAGEM)
+
+
+def validar_documento(arquivo):
+    _validar(arquivo, EXTENSOES_DOCUMENTO)
+```
+
+- [ ] **Step 4: Rodar os testes**
+
+```bash
+pytest core/tests/test_uploads.py -v
+```
+Esperado: 11 testes passando.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add core/uploads.py core/tests/test_uploads.py
+git commit -m "feat(core): adiciona upload com nome opaco e validacao de formato"
 ```
 
 ---
@@ -999,7 +1171,11 @@ class DocumentoAcolhido(SoftDeleteModel):
     acolhido = models.ForeignKey(
         Acolhido, on_delete=models.CASCADE, related_name="documentos"
     )
-    arquivo = models.FileField("arquivo", upload_to="acolhidos/documentos/")
+    arquivo = models.FileField(
+        "arquivo",
+        upload_to=caminho_opaco("acolhidos/documentos"),
+        validators=[validar_documento],
+    )
     tipo = models.CharField("tipo", max_length=80)
     descricao = models.CharField("descrição", max_length=200, blank=True)
 
@@ -1031,7 +1207,10 @@ class Consentimento(SoftDeleteModel):
                 "aos órgãos de controle.",
     )
     termo_assinado = models.FileField(
-        "termo assinado", upload_to="acolhidos/consentimentos/", blank=True
+        "termo assinado",
+        upload_to=caminho_opaco("acolhidos/consentimentos"),
+        validators=[validar_documento],
+        blank=True,
     )
 
     class Meta:
@@ -1084,7 +1263,7 @@ class MedicacaoFactory(factory.django.DjangoModelFactory):
 
 - [ ] **Step 5: Gerar migration e rodar**
 
-```powershell
+```bash
 python manage.py makemigrations acolhidos
 python manage.py migrate
 ```
@@ -1298,6 +1477,7 @@ class RegistraAcessoFichaMixin:
 - [ ] **Step 5: Escrever `core/storage.py`**
 
 ```python
+import mimetypes
 from pathlib import Path
 
 from django.conf import settings
@@ -1307,6 +1487,10 @@ from django.http import FileResponse, Http404
 
 # Prefixos cujo conteudo e vedado ao perfil Operacional.
 PREFIXOS_SIGILOSOS = ("acolhidos/documentos/", "acolhidos/consentimentos/")
+
+# Tipos que o navegador pode renderizar em linha com seguranca. Qualquer outro
+# e entregue como download.
+TIPOS_EM_LINHA = {"image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"}
 
 
 @login_required
@@ -1329,7 +1513,22 @@ def servir_media_protegida(request, caminho: str):
     if not destino.is_file():
         raise Http404("Arquivo não encontrado.")
 
-    return FileResponse(destino.open("rb"))
+    tipo, _ = mimetypes.guess_type(destino.name)
+    tipo = tipo or "application/octet-stream"
+
+    # Arquivo que o navegador executaria (SVG, HTML) sai como download, nunca
+    # renderizado: renderizado, rodaria script na mesma origem do sistema, com
+    # a sessao de quem abriu.
+    resposta = FileResponse(
+        destino.open("rb"),
+        content_type=tipo,
+        as_attachment=tipo not in TIPOS_EM_LINHA,
+        filename=destino.name,
+    )
+    # Impede o navegador de adivinhar um tipo diferente do declarado.
+    resposta["X-Content-Type-Options"] = "nosniff"
+    resposta["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    return resposta
 ```
 
 - [ ] **Step 6: Ligar a rota e desativar o servidor de mídia do Django**
@@ -1352,11 +1551,9 @@ em desenvolvimento, treina o hábito errado e vaza em qualquer demonstração.
 
 - [ ] **Step 7: Gerar migration, rodar os testes**
 
-```powershell
-
+```bash
 python manage.py makemigrations accounts
 python manage.py migrate
-
 ```
 
 ```bash
@@ -3048,6 +3245,21 @@ class TestSeedDemo:
         primeira_contagem = Acolhido.todos.count()
         call_command("seed_demo", "--limpar", verbosity=0)
         assert Acolhido.todos.count() == primeira_contagem
+
+    def test_recusa_rodar_com_debug_desligado(self, settings):
+        """O comando apaga dados. Sem essa trava, rodá-lo por engano no banco
+        da instituição levaria junto a ficha de cada criança."""
+        from django.core.management.base import CommandError
+
+        settings.DEBUG = False
+        with pytest.raises(CommandError) as erro:
+            call_command("seed_demo", "--limpar", verbosity=0)
+        assert "não deve rodar em produção" in str(erro.value)
+
+    def test_forcar_permite_rodar_com_debug_desligado(self, settings):
+        settings.DEBUG = False
+        call_command("seed_demo", "--forcar", verbosity=0)
+        assert Acolhido.objects.exists()
 ```
 
 - [ ] **Step 2: Rodar e confirmar a falha**
@@ -3068,7 +3280,7 @@ touch acolhidos/management/__init__.py acolhidos/management/commands/__init__.py
 ```python
 from datetime import date, timedelta
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from acolhidos.models import (
@@ -3113,11 +3325,26 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--limpar", action="store_true",
-            help="Apaga os dados de demonstração antes de recriar.",
+            help="Apaga TODOS os registros antes de recriar. Só com DEBUG=True.",
+        )
+        parser.add_argument(
+            "--forcar", action="store_true",
+            help="Permite rodar com DEBUG=False. Use apenas em banco descartável.",
         )
 
     @transaction.atomic
     def handle(self, *args, **opcoes):
+        from django.conf import settings
+
+        # `--limpar` apaga acolhidos, doadores e voluntarios. Rodado por engano
+        # no banco da instituicao, levaria junto a ficha de cada crianca. Por
+        # isso so passa com DEBUG ligado, ou com --forcar explicito.
+        if not settings.DEBUG and not opcoes["forcar"]:
+            raise CommandError(
+                "Este comando cria dados fictícios e não deve rodar em produção. "
+                "Se o banco for descartável, repita com --forcar."
+            )
+
         if opcoes["limpar"]:
             Acolhido.todos.all().delete()
             Responsavel.todos.all().delete()
@@ -3245,8 +3472,7 @@ ruff format --check .
 
 - [ ] **Step 6: Verificação manual no navegador**
 
-```powershell
-
+```bash
 python manage.py migrate
 
 python manage.py seed_demo

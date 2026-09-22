@@ -483,11 +483,9 @@ class DoacaoFactory(factory.django.DjangoModelFactory):
 
 - [ ] **Step 6: Gerar migration e rodar**
 
-```powershell
-
+```bash
 python manage.py makemigrations doacoes
 python manage.py migrate
-
 ```
 
 ```bash
@@ -1578,10 +1576,19 @@ class TestRecibo:
         conteudo = client.get(reverse("doacoes:recibo", args=[doacao.pk])).content.decode()
         assert "Anônimo" in conteudo
 
-    def test_marca_recibo_como_emitido(self, client, usuario_operacional):
+    def test_abrir_o_recibo_nao_altera_estado(self, client, usuario_operacional):
+        """GET não muda estado: prefetch do navegador ou uma <img src> embutida
+        em site externo marcariam recibos sem ninguém pedir."""
         doacao = DoacaoFactory(recibo_emitido=False)
         client.force_login(usuario_operacional)
         client.get(reverse("doacoes:recibo", args=[doacao.pk]))
+        doacao.refresh_from_db()
+        assert doacao.recibo_emitido is False
+
+    def test_post_marca_como_entregue(self, client, usuario_operacional):
+        doacao = DoacaoFactory(recibo_emitido=False)
+        client.force_login(usuario_operacional)
+        client.post(reverse("doacoes:recibo", args=[doacao.pk]))
         doacao.refresh_from_db()
         assert doacao.recibo_emitido is True
 
@@ -1632,9 +1639,31 @@ python -c "import weasyprint; print(weasyprint.__version__)"
 - [ ] **Step 4: Escrever `core/pdf.py`**
 
 ```python
+from pathlib import Path
+
+from django.conf import settings
 from django.http import HttpResponse
 from django.template.loader import render_to_string
-from weasyprint import HTML
+from weasyprint import HTML, default_url_fetcher
+
+
+def _buscador_restrito(url: str):
+    """Permite que o PDF carregue apenas arquivos estaticos do proprio projeto.
+
+    Por padrao o WeasyPrint busca qualquer URL que apareca no HTML, inclusive
+    `file:///`. Como os templates renderizam texto vindo do banco, uma
+    referencia forjada leria arquivo do servidor — o `.env`, por exemplo — e o
+    embutiria no PDF entregue ao usuario.
+    """
+    if url.startswith("file://"):
+        caminho = Path(url.removeprefix("file://").lstrip("/")).resolve()
+        permitidos = [Path(settings.STATIC_ROOT).resolve()]
+        permitidos += [Path(d).resolve() for d in settings.STATICFILES_DIRS]
+        if not any(caminho.is_relative_to(raiz) for raiz in permitidos):
+            raise ValueError(f"Acesso a arquivo não autorizado: {url}")
+        return default_url_fetcher(url)
+
+    raise ValueError(f"O PDF não carrega recursos externos: {url}")
 
 
 def renderizar_pdf(template: str, contexto: dict, nome_arquivo: str, request=None):
@@ -1644,11 +1673,15 @@ def renderizar_pdf(template: str, contexto: dict, nome_arquivo: str, request=Non
     um segundo layout a manter.
     """
     html = render_to_string(template, contexto, request=request)
-    base_url = request.build_absolute_uri("/") if request else None
-    pdf = HTML(string=html, base_url=base_url).write_pdf()
+    pdf = HTML(
+        string=html,
+        base_url=str(settings.BASE_DIR),
+        url_fetcher=_buscador_restrito,
+    ).write_pdf()
 
     resposta = HttpResponse(pdf, content_type="application/pdf")
     resposta["Content-Disposition"] = f'inline; filename="{nome_arquivo}"'
+    resposta["X-Content-Type-Options"] = "nosniff"
     return resposta
 ```
 
@@ -1656,6 +1689,8 @@ def renderizar_pdf(template: str, contexto: dict, nome_arquivo: str, request=Non
 
 Em `doacoes/views.py`:
 ```python
+from django.contrib import messages
+from django.shortcuts import redirect
 from django.utils import timezone
 
 from core.pdf import renderizar_pdf
@@ -1683,10 +1718,9 @@ class ReciboView(PerfilRequiredMixin, DetailView):
     def get(self, request, *args, **kwargs):
         resposta = super().get(request, *args, **kwargs)
 
-        if not self.object.recibo_emitido:
-            self.object.recibo_emitido = True
-            self.object.save(update_fields=["recibo_emitido"])
-
+        # A marcacao de "recibo emitido" acontece no POST, nunca aqui: um GET
+        # nao deve alterar estado. Do jeito contrario, o prefetch do navegador
+        # ou uma <img src> embutida em site externo marcaria recibos sozinha.
         if request.GET.get("formato") == "pdf":
             return renderizar_pdf(
                 self.template_name,
@@ -1695,6 +1729,15 @@ class ReciboView(PerfilRequiredMixin, DetailView):
                 request=request,
             )
         return resposta
+
+    def post(self, request, *args, **kwargs):
+        """Marca o recibo como entregue ao doador."""
+        self.object = self.get_object()
+        if not self.object.recibo_emitido:
+            self.object.recibo_emitido = True
+            self.object.save(update_fields=["recibo_emitido"])
+            messages.success(request, "Recibo marcado como entregue.")
+        return redirect("doacoes:recibo", pk=self.object.pk)
 ```
 
 Os dados da instituição ficam vazios por ora. Preenchê-los exige CNPJ e endereço
@@ -1784,9 +1827,17 @@ Em `doacoes/urls.py`:
     · Documento gerado pelo sistema ComViver
   </p>
 
-  <p class="nao-imprimir" style="text-align:center; margin-top:2rem;">
+  <div class="nao-imprimir" style="text-align:center; margin-top:2rem;">
     <a href="?formato=pdf">Baixar em PDF</a>
-  </p>
+    {% if not doacao.recibo_emitido %}
+      <form method="post" style="display:inline; margin-left:1rem;">
+        {% csrf_token %}
+        <button type="submit">Marcar como entregue ao doador</button>
+      </form>
+    {% else %}
+      <span style="margin-left:1rem; color:#555;">Já entregue ao doador.</span>
+    {% endif %}
+  </div>
 </body>
 </html>
 ```

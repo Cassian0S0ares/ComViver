@@ -208,7 +208,12 @@ class ConfiguracaoInstituicao(TimeStampedModel):
     telefone = models.CharField("telefone", max_length=20, blank=True)
     email = models.EmailField("e-mail", blank=True)
     responsavel_legal = models.CharField("responsável legal", max_length=150, blank=True)
-    logo = models.ImageField("logotipo", upload_to="instituicao/", blank=True)
+    logo = models.ImageField(
+        "logotipo",
+        upload_to=caminho_opaco("instituicao"),
+        validators=[validar_imagem],
+        blank=True,
+    )
 
     class Meta:
         verbose_name = "configuração da instituição"
@@ -364,11 +369,9 @@ do formulário:
 
 - [ ] **Step 7: Migration e testes**
 
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py makemigrations core
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 ```
 
 ```bash
@@ -2051,6 +2054,7 @@ class Command(BaseCommand):
     def handle(self, *args, **opcoes):
         destino = Path(opcoes["saida"])
         destino.mkdir(parents=True, exist_ok=True)
+        self._restringir_permissoes(destino)
 
         carimbo = datetime.now().strftime("%Y-%m-%d-%H%M%S")
         arquivo = destino / f"comviver-{carimbo}.json"
@@ -2063,8 +2067,33 @@ class Command(BaseCommand):
                 stdout=saida,
             )
 
+        self._restringir_permissoes(arquivo)
+
         self.stdout.write(self.style.SUCCESS(f"Backup gravado em {arquivo}"))
+        self.stdout.write(
+            self.style.WARNING(
+                "Este arquivo contém a ficha de cada acolhido e os hashes de "
+                "senha dos usuários. Trate-o como documento sigiloso: guarde em "
+                "local com acesso restrito e nunca o envie por e-mail ou "
+                "aplicativo de mensagem."
+            )
+        )
         self._remover_antigos(destino, opcoes["manter"])
+
+    def _restringir_permissoes(self, caminho: Path):
+        """Remove leitura de outros usuarios da maquina.
+
+        Em Windows o modo POSIX e ignorado; a protecao real vem da ACL da pasta,
+        descrita no manual do administrador.
+        """
+        import os
+        import stat
+
+        try:
+            modo = stat.S_IRWXU if caminho.is_dir() else stat.S_IRUSR | stat.S_IWUSR
+            os.chmod(caminho, modo)
+        except OSError:
+            pass
 
     def _remover_antigos(self, destino: Path, manter: int):
         """Remove apenas arquivos que seguem o padrao de nome deste comando.
@@ -2246,6 +2275,24 @@ Gera `backups/comviver-AAAA-MM-DD-HHMMSS.json` e mantém os 30 mais recentes.
 serviço de nuvem ou pendrive periodicamente. Backup que mora no mesmo disco não
 protege contra a falha mais provável, que é o disco parar.
 
+### O backup é um documento sigiloso
+
+O arquivo contém a ficha completa de cada criança acolhida — motivo do
+acolhimento, processo judicial, dados de saúde — e os hashes de senha dos
+usuários. Um backup vazado equivale ao sistema inteiro vazado, sem as proteções
+de perfil.
+
+Regras para quem cuida dele:
+
+- Restrinja a pasta `backups/` ao usuário que roda o sistema. No Windows:
+  botão direito → Propriedades → Segurança → remova "Usuários" e "Todos"
+- Se copiar para nuvem, use conta da instituição com autenticação em duas
+  etapas, nunca conta pessoal
+- Se copiar para pendrive, guarde-o trancado junto com os documentos físicos
+- Nunca envie por e-mail, WhatsApp ou qualquer aplicativo de mensagem
+- Ao descartar backups antigos fora da pasta, apague de fato — não basta mover
+  para a lixeira
+
 **Para restaurar:**
 ```bash
 python manage.py loaddata backups/comviver-AAAA-MM-DD-HHMMSS.json
@@ -2256,13 +2303,7 @@ python manage.py loaddata backups/comviver-AAAA-MM-DD-HHMMSS.json
 ```bash
 git pull
 pip install -r requirements/prod.txt
-```
-
-PowerShell, para as migrations:
-```powershell
-$env:USE_DIRECT_DB = "1"
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 python manage.py collectstatic --noinput
 ```
 
@@ -2274,7 +2315,7 @@ O sistema está preparado para qualquer serviço que rode Python com PostgreSQL.
 
 1. Criar o banco e obter a URL de conexão
 2. Definir as variáveis de ambiente: `SECRET_KEY`, `DEBUG=False`,
-   `ALLOWED_HOSTS`, `DATABASE_URL`, `DIRECT_URL`
+   `ALLOWED_HOSTS`, `DATABASE_URL`
 3. Usar `comviver.settings.prod` como `DJANGO_SETTINGS_MODULE`
 4. Rodar migrations e `collectstatic`
 5. Servir com `gunicorn comviver.wsgi`
@@ -2316,10 +2357,8 @@ ruff format --check .
 
 - [ ] **Step 7: Verificação manual completa**
 
-```powershell
-$env:USE_DIRECT_DB = "1"
+```bash
 python manage.py migrate
-$env:USE_DIRECT_DB = ""
 python manage.py seed_demo --limpar
 python manage.py runserver
 ```
