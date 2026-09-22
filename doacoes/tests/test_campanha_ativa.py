@@ -105,3 +105,32 @@ class TestFormularioDeDoacao:
         doacao.refresh_from_db()
         assert doacao.campanha == encerrada
         assert doacao.valor == 150
+
+
+class TestListaDeCampanhas:
+    def test_abre_mostrando_so_as_ativas(self, client, usuario_operacional):
+        """Quem abre a tela quer ver o que esta valendo agora."""
+        ativa = CampanhaFactory(nome="Volta às aulas")
+        CampanhaFactory(nome="Natal 2025", data_fim=HOJE - timedelta(days=30))
+        client.force_login(usuario_operacional)
+        resposta = client.get(reverse("doacoes:campanha_lista"))
+        assert list(resposta.context["object_list"]) == [ativa]
+        assert resposta.context["situacao_filtrada"] == "ativas"
+
+    def test_filtro_de_inativas_continua_funcionando(self, client, usuario_operacional):
+        CampanhaFactory(nome="Volta às aulas")
+        encerrada = CampanhaFactory(nome="Natal 2025", data_fim=HOJE - timedelta(days=30))
+        client.force_login(usuario_operacional)
+        lista = client.get(reverse("doacoes:campanha_lista") + "?situacao=inativas").context[
+            "object_list"
+        ]
+        assert list(lista) == [encerrada]
+
+    def test_filtro_de_todas_traz_as_duas(self, client, usuario_operacional):
+        CampanhaFactory(nome="Volta às aulas")
+        CampanhaFactory(nome="Natal 2025", data_fim=HOJE - timedelta(days=30))
+        client.force_login(usuario_operacional)
+        lista = client.get(reverse("doacoes:campanha_lista") + "?situacao=todas").context[
+            "object_list"
+        ]
+        assert len(lista) == 2

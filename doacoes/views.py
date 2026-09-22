@@ -1,11 +1,17 @@
+from django.contrib import messages
+from django.core.paginator import Paginator
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
-from django.views.generic import DetailView, ListView
+from django.utils import timezone
+from django.utils.dateparse import parse_date
+from django.views.generic import DetailView, ListView, View
 
 from accounts.models import Perfil
 from core.mixins import PerfilRequiredMixin
+from core.pdf import renderizar_pdf
 from core.views import BaseCreateView, BaseListView, BaseUpdateView
 from doacoes.forms import CampanhaForm, DoacaoForm, DoadorForm
-from doacoes.models import Campanha, Doacao, Doador
+from doacoes.models import Campanha, Doacao, Doador, TipoDoacao
 
 TODOS_OS_PERFIS = [Perfil.ADMIN, Perfil.TECNICO, Perfil.OPERACIONAL]
 QUEM_REGISTRA = [Perfil.ADMIN, Perfil.OPERACIONAL]
@@ -31,6 +37,7 @@ class DoacaoListView(BaseListView):
         contexto = super().get_context_data(**kwargs)
         contexto["tipo_filtrado"] = self.request.GET.get("tipo", "")
         contexto["totais"] = totais_por_tipo(self.get_queryset())
+        contexto["form_tipos"] = TipoDoacao.choices
         return contexto
 
 
@@ -46,9 +53,14 @@ class DoacaoCreateView(BaseCreateView):
 
     def get_initial(self):
         inicial = super().get_initial()
-        if doador := self.request.GET.get("doador"):
+        doador = self.request.GET.get("doador", "")
+        if doador.isdecimal() and len(doador) < 19 and Doador.objects.filter(pk=doador).exists():
             inicial["doador"] = doador
-        if data := self.request.GET.get("data"):
+        try:
+            data = parse_date(self.request.GET.get("data", ""))
+        except ValueError:
+            data = None
+        if data and data <= timezone.localdate():
             inicial["data_recebimento"] = data
         return inicial
 
@@ -96,6 +108,14 @@ class DoadorListView(BaseListView):
     campos_busca = ["nome", "cpf_cnpj", "email"]
     perfis_permitidos = TODOS_OS_PERFIS
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.request.GET.get("inativos") == "1":
+            from doacoes.services import doadores_recorrentes_inativos
+
+            qs = qs.filter(pk__in=doadores_recorrentes_inativos().values("pk"))
+        return qs
+
 
 class DoadorDetailView(PerfilRequiredMixin, DetailView):
     model = Doador
@@ -105,7 +125,10 @@ class DoadorDetailView(PerfilRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
-        contexto["doacoes"] = self.object.doacoes.select_related("campanha")
+        pagina = Paginator(self.object.doacoes.select_related("campanha"), 25).get_page(
+            self.request.GET.get("page")
+        )
+        contexto.update(doacoes=pagina.object_list, page_obj=pagina, paginator=pagina.paginator)
         return contexto
 
 
@@ -138,6 +161,25 @@ class CampanhaListView(BaseListView):
     campos_busca = ["nome"]
     perfis_permitidos = TODOS_OS_PERFIS
 
+    SITUACOES = {"ativas", "inativas", "todas"}
+
+    def _situacao(self) -> str:
+        """A tela abre no que esta valendo hoje; o resto fica a um filtro."""
+        situacao = self.request.GET.get("situacao", "ativas")
+        return situacao if situacao in self.SITUACOES else "ativas"
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        situacao = self._situacao()
+        if situacao == "ativas":
+            return qs.ativas()
+        if situacao == "inativas":
+            return qs.exclude(pk__in=Campanha.objects.ativas().values("pk"))
+        return qs
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(**kwargs) | {"situacao_filtrada": self._situacao()}
+
 
 class CampanhaCreateView(BaseCreateView):
     model = Campanha
@@ -156,11 +198,19 @@ class CampanhaUpdateView(BaseUpdateView):
     success_url = reverse_lazy("doacoes:campanha_lista")
     perfis_permitidos = [Perfil.ADMIN]
 
-from django.contrib import messages
-from django.shortcuts import redirect
-from django.utils import timezone
 
-from core.pdf import renderizar_pdf
+class CampanhaEncerrarView(PerfilRequiredMixin, View):
+    perfis_permitidos = [Perfil.ADMIN]
+
+    def post(self, request, *args, **kwargs):
+        campanha = get_object_or_404(Campanha, pk=self.kwargs["pk"])
+        if campanha.encerrada_em is None:
+            campanha.encerrada_em = timezone.now()
+            campanha.save(update_fields=["encerrada_em", "atualizado_em"])
+            messages.success(request, "Campanha encerrada.")
+        else:
+            messages.info(request, "Esta campanha já foi encerrada.")
+        return redirect("doacoes:campanha_editar", pk=campanha.pk)
 
 
 class ReciboView(PerfilRequiredMixin, DetailView):
@@ -171,6 +221,9 @@ class ReciboView(PerfilRequiredMixin, DetailView):
     context_object_name = "doacao"
     perfis_permitidos = QUEM_REGISTRA
 
+    def get_queryset(self):
+        return super().get_queryset().select_related("doador", "campanha", "recebido_por")
+
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
         contexto["emitido_em"] = timezone.localtime()
@@ -180,6 +233,12 @@ class ReciboView(PerfilRequiredMixin, DetailView):
             "cnpj": "",
             "endereco": "",
         }
+        responsavel = self.object.recebido_por
+        contexto["responsavel_nome"] = (
+            responsavel.get_full_name() or responsavel.username
+            if responsavel
+            else contexto["instituicao"]["nome"]
+        )
         return contexto
 
     def get(self, request, *args, **kwargs):
@@ -202,6 +261,6 @@ class ReciboView(PerfilRequiredMixin, DetailView):
         self.object = self.get_object()
         if not self.object.recibo_emitido:
             self.object.recibo_emitido = True
-            self.object.save(update_fields=["recibo_emitido"])
+            self.object.save(update_fields=["recibo_emitido", "atualizado_em"])
             messages.success(request, "Recibo marcado como entregue.")
         return redirect("doacoes:recibo", pk=self.object.pk)
