@@ -158,6 +158,14 @@ class MedicacaoEmVigorManager(SoftDeleteManager):
         )
 
 
+class Destino(models.TextChoices):
+    REINTEGRACAO = "REINTEGRACAO", "Reintegração familiar"
+    ADOCAO = "ADOCAO", "Adoção"
+    MAIORIDADE = "MAIORIDADE", "Maioridade"
+    TRANSFERENCIA = "TRANSFERENCIA", "Transferência para outra instituição"
+    OUTRO = "OUTRO", "Outro"
+
+
 class FichaAcolhimento(SoftDeleteModel):
     """Circunstancias do acolhimento e situacao juridica.
 
@@ -173,7 +181,10 @@ class FichaAcolhimento(SoftDeleteModel):
     medida_protetiva = models.TextField("medida protetiva", blank=True)
 
     data_desligamento = models.DateField("data de desligamento", null=True, blank=True)
-    destino = models.CharField("destino após o desligamento", max_length=150, blank=True)
+    destino = models.CharField(
+        "destino após o desligamento", max_length=150, choices=Destino.choices, blank=True
+    )
+    observacao_desligamento = models.TextField("observação do desligamento", blank=True)
 
     history = HistoricalRecords()
 

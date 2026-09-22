@@ -3,7 +3,15 @@ from django.core.validators import MaxLengthValidator
 from django.utils import timezone
 
 from accounts.forms import FormularioAcessivelMixin
-from acolhidos.models import Acolhido, DadosSaude, FichaAcolhimento, Turno
+from acolhidos.models import (
+    Acolhido,
+    DadosSaude,
+    Destino,
+    FichaAcolhimento,
+    Responsavel,
+    Turno,
+    VinculoFamiliar,
+)
 
 
 def _aplicar_classes(campos):
@@ -128,3 +136,107 @@ class EtapaResponsavelForm(FormularioAcolhidos, forms.Form):
         if cpf and len(cpf) != 11:
             raise forms.ValidationError("O CPF precisa ter 11 dígitos.")
         return cpf
+
+
+class DesligamentoForm(FormularioAcolhidos, forms.Form):
+    """Desligamento e acao explicita, nao edicao de campo.
+
+    Muda o status, preenche a ficha e preserva todo o historico.
+    """
+
+    data_desligamento = forms.DateField(label="Data do desligamento")
+    destino = forms.ChoiceField(label="Destino", choices=[("", "—"), *Destino.choices])
+    observacao = forms.CharField(label="Observação", required=False, widget=forms.Textarea)
+
+    def __init__(self, *args, acolhido=None, **kwargs):
+        self.acolhido = acolhido
+        super().__init__(*args, **kwargs)
+
+    def clean_data_desligamento(self):
+        data = self.cleaned_data["data_desligamento"]
+        if data > timezone.localdate():
+            raise forms.ValidationError("A data de desligamento não pode ser no futuro.")
+        ficha = getattr(self.acolhido, "ficha", None)
+        if ficha and data < ficha.data_entrada:
+            raise forms.ValidationError(
+                "A data de desligamento não pode ser anterior à data de entrada "
+                f"({ficha.data_entrada:%d/%m/%Y})."
+            )
+        return data
+
+
+class VinculoForm(FormularioAcolhidos, forms.ModelForm):
+    """Vincula um responsavel ao acolhido.
+
+    Permite escolher alguem ja cadastrado — irmaos acolhidos compartilham
+    responsavel, e duplicar o cadastro deixaria telefone desatualizado em um
+    dos registros.
+    """
+
+    nome_novo = forms.CharField(label="Ou cadastre um novo", max_length=150, required=False)
+    telefone_novo = forms.CharField(
+        label="Telefone do novo responsável", max_length=20, required=False
+    )
+
+    class Meta:
+        model = VinculoFamiliar
+        fields = [
+            "responsavel",
+            "nome_novo",
+            "telefone_novo",
+            "parentesco",
+            "e_guardiao",
+            "autorizado_visita",
+            "autorizado_retirar",
+            "observacoes",
+        ]
+        labels = {"responsavel": "Responsável já cadastrado"}
+
+    def __init__(self, *args, acolhido=None, usuario=None, **kwargs):
+        self.acolhido = acolhido
+        self.usuario = usuario
+        super().__init__(*args, **kwargs)
+        self.fields["responsavel"].required = False
+        self.fields["responsavel"].queryset = Responsavel.objects.all()
+        self.fields["responsavel"].empty_label = "Escolha na lista"
+
+    def validate_unique(self):
+        # A unicidade do par e conferida em clean(), com mensagem em portugues
+        # e considerando tambem o responsavel novo.
+        pass
+
+    def clean(self):
+        dados = super().clean()
+        responsavel = dados.get("responsavel")
+        nome_novo = (dados.get("nome_novo") or "").strip()
+
+        if not responsavel and not nome_novo:
+            raise forms.ValidationError(
+                "Escolha um responsável já cadastrado ou informe o nome de um novo."
+            )
+
+        if responsavel and self.acolhido:
+            ja_existe = (
+                VinculoFamiliar.objects.filter(acolhido=self.acolhido, responsavel=responsavel)
+                .exclude(pk=self.instance.pk)
+                .exists()
+            )
+            if ja_existe:
+                raise forms.ValidationError(
+                    f"{responsavel.nome} já está vinculada a este acolhido."
+                )
+
+        return dados
+
+    def save(self, commit=True):
+        vinculo = super().save(commit=False)
+        if not vinculo.responsavel_id:
+            vinculo.responsavel = Responsavel.objects.create(
+                nome=self.cleaned_data["nome_novo"].strip(),
+                telefone=self.cleaned_data.get("telefone_novo", ""),
+                criado_por=self.usuario,
+            )
+        vinculo.acolhido = self.acolhido
+        if commit:
+            vinculo.save()
+        return vinculo

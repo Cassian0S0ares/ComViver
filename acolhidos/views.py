@@ -2,27 +2,31 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.files.storage import FileSystemStorage
 from django.db import transaction
-from django.shortcuts import redirect
-from django.views.generic import DetailView
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse
+from django.views.generic import DetailView, FormView, UpdateView
 from formtools.wizard.views import SessionWizardView
 
-from accounts.models import Perfil
+from accounts.models import AcaoFicha, LogAcessoFicha, Perfil
 from acolhidos.forms import (
+    DesligamentoForm,
     EtapaAcolhimentoForm,
     EtapaIdentificacaoForm,
     EtapaResponsavelForm,
     EtapaSaudeEscolaForm,
+    VinculoForm,
 )
 from acolhidos.models import (
     Acolhido,
     Escolaridade,
+    FichaAcolhimento,
     Medicacao,
     Responsavel,
     StatusAcolhido,
     VinculoFamiliar,
 )
 from core.mixins import PerfilRequiredMixin, RegistraAcessoFichaMixin
-from core.views import BaseListView
+from core.views import BaseCreateView, BaseListView, BaseUpdateView
 
 TODOS_OS_PERFIS = [Perfil.ADMIN, Perfil.TECNICO, Perfil.OPERACIONAL]
 EQUIPE_TECNICA = [Perfil.ADMIN, Perfil.TECNICO]
@@ -192,3 +196,149 @@ class AcolhimentoWizard(PerfilRequiredMixin, SessionWizardView):
 
         messages.success(self.request, f"Acolhimento de {acolhido.nome_exibicao} registrado.")
         return redirect("acolhidos:detalhe", pk=acolhido.pk)
+
+
+def _registrar_alteracao(usuario, acolhido):
+    LogAcessoFicha.registrar(usuario, acolhido, AcaoFicha.EDIT)
+
+
+class AcolhidoUpdateView(BaseUpdateView):
+    model = Acolhido
+    form_class = EtapaIdentificacaoForm
+    template_name = "acolhidos/acolhido_form.html"
+    context_object_name = "acolhido"
+    mensagem_sucesso = "Dados do acolhido atualizados."
+    perfis_permitidos = EQUIPE_TECNICA
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.pop("usuario", None)  # EtapaIdentificacaoForm nao recorta campos por perfil
+        return kwargs
+
+    def form_valid(self, form):
+        resposta = super().form_valid(form)
+        _registrar_alteracao(self.request.user, self.object)
+        return resposta
+
+    def get_success_url(self):
+        return reverse("acolhidos:detalhe", args=[self.object.pk])
+
+
+class FichaUpdateView(PerfilRequiredMixin, UpdateView):
+    model = FichaAcolhimento
+    form_class = EtapaAcolhimentoForm
+    template_name = "acolhidos/ficha_form.html"
+    perfis_permitidos = EQUIPE_TECNICA
+
+    def get_object(self, queryset=None):
+        self.acolhido = get_object_or_404(Acolhido, pk=self.kwargs["pk"])
+        # Sem ficha, o formulario parte de um objeto ainda nao salvo: abrir a
+        # tela nao pode gravar uma ficha com data de entrada inventada.
+        return getattr(self.acolhido, "ficha", None) or FichaAcolhimento(acolhido=self.acolhido)
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(**kwargs) | {"acolhido": self.acolhido}
+
+    def form_valid(self, form):
+        if not form.instance.pk:
+            form.instance.criado_por = self.request.user
+        resposta = super().form_valid(form)
+        _registrar_alteracao(self.request.user, self.acolhido)
+        messages.success(self.request, "Ficha de acolhimento atualizada.")
+        return resposta
+
+    def get_success_url(self):
+        return reverse("acolhidos:detalhe", args=[self.acolhido.pk])
+
+
+class DesligamentoView(PerfilRequiredMixin, FormView):
+    template_name = "acolhidos/acolhido_desligar.html"
+    form_class = DesligamentoForm
+    perfis_permitidos = EQUIPE_TECNICA
+
+    def dispatch(self, request, *args, **kwargs):
+        self.acolhido = get_object_or_404(Acolhido, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        if self.acolhido.status == StatusAcolhido.DESLIGADO:
+            return self._ja_desligado()
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        if self.acolhido.status == StatusAcolhido.DESLIGADO:
+            return self._ja_desligado()
+        return super().post(request, *args, **kwargs)
+
+    def _ja_desligado(self):
+        messages.info(self.request, f"{self.acolhido.nome_exibicao} já está desligado.")
+        return redirect("acolhidos:detalhe", pk=self.acolhido.pk)
+
+    def get_form_kwargs(self):
+        return super().get_form_kwargs() | {"acolhido": self.acolhido}
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(**kwargs) | {"acolhido": self.acolhido}
+
+    @transaction.atomic
+    def form_valid(self, form):
+        data = form.cleaned_data["data_desligamento"]
+        # Sem ficha, a entrada e registrada como o proprio dia do desligamento:
+        # qualquer outra data seria inventada.
+        ficha = getattr(self.acolhido, "ficha", None) or FichaAcolhimento(
+            acolhido=self.acolhido, data_entrada=data, criado_por=self.request.user
+        )
+        ficha.data_desligamento = data
+        ficha.destino = form.cleaned_data["destino"]
+        ficha.observacao_desligamento = form.cleaned_data.get("observacao", "")
+        ficha.save()
+
+        self.acolhido.status = StatusAcolhido.DESLIGADO
+        self.acolhido.save(update_fields=["status", "atualizado_em"])
+
+        _registrar_alteracao(self.request.user, self.acolhido)
+        messages.success(
+            self.request,
+            f"Desligamento de {self.acolhido.nome_exibicao} registrado. "
+            "O histórico permanece consultável.",
+        )
+        return redirect("acolhidos:detalhe", pk=self.acolhido.pk)
+
+
+class _VinculoMixin:
+    template_name = "acolhidos/vinculo_form.html"
+    perfis_permitidos = EQUIPE_TECNICA
+
+    def get_form_kwargs(self):
+        return super().get_form_kwargs() | {"acolhido": self.acolhido}
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(**kwargs) | {"acolhido": self.acolhido}
+
+    def form_valid(self, form):
+        resposta = super().form_valid(form)
+        _registrar_alteracao(self.request.user, self.acolhido)
+        return resposta
+
+    def get_success_url(self):
+        return reverse("acolhidos:detalhe", args=[self.acolhido.pk])
+
+
+class VinculoCreateView(_VinculoMixin, BaseCreateView):
+    model = VinculoFamiliar
+    form_class = VinculoForm
+    mensagem_sucesso = "Vínculo familiar registrado."
+
+    def dispatch(self, request, *args, **kwargs):
+        self.acolhido = get_object_or_404(Acolhido, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+
+class VinculoUpdateView(_VinculoMixin, BaseUpdateView):
+    model = VinculoFamiliar
+    form_class = VinculoForm
+    mensagem_sucesso = "Vínculo familiar atualizado."
+
+    def dispatch(self, request, *args, **kwargs):
+        self.acolhido = get_object_or_404(VinculoFamiliar, pk=kwargs["pk"]).acolhido
+        return super().dispatch(request, *args, **kwargs)
