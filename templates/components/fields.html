@@ -18,7 +18,7 @@
     {% if field.errors %}<div class="field-error" id="{{ field.id_for_label }}_error">{{ field.errors }}</div>{% endif %}
   </div>
   {% else %}
-  <div class="field {% if field.field.widget.input_type == 'checkbox' %}field-checkbox{% endif %}">
+  <div class="field {% if field.field.widget.input_type == 'checkbox' %}field-checkbox{% endif %}" data-campo="{{ field.name }}">
     <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required" aria-hidden="true"> *</span>{% endif %}</label>
     <div class="field-control">{{ field }}{% if field.field.widget.input_type == 'password' %}<button class="password-toggle" type="button" disabled data-enhancement data-password="{{ field.id_for_label }}" aria-label="Mostrar {{ field.label|lower }}" aria-pressed="false"><i class="bi bi-eye" aria-hidden="true"></i></button>{% endif %}</div>
     <div class="field-help" id="{{ field.id_for_label }}_helptext">{{ field.help_text|safe }}</div>

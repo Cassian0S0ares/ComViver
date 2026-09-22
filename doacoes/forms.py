@@ -3,8 +3,7 @@ from django.core.exceptions import PermissionDenied
 
 from accounts.forms import FormularioAcessivelMixin
 from accounts.models import Perfil
-
-from doacoes.models import Campanha, Doacao, Doador
+from doacoes.models import Campanha, Doacao, Doador, TipoDoacao
 
 
 def _aplicar_classes(campos):
@@ -21,8 +20,7 @@ class FormularioDoacoesMixin(FormularioAcessivelMixin):
     perfis_permitidos = (Perfil.ADMIN, Perfil.OPERACIONAL)
 
     def __init__(self, *args, usuario=None, **kwargs):
-        if (usuario is None or not usuario.is_active
-                or usuario.perfil not in self.perfis_permitidos):
+        if usuario is None or not usuario.is_active or usuario.perfil not in self.perfis_permitidos:
             raise PermissionDenied("Seu perfil não pode alterar este cadastro.")
         self.usuario = usuario
         super().__init__(*args, **kwargs)
@@ -32,8 +30,15 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
     class Meta:
         model = Doacao
         fields = [
-            "doador", "campanha", "tipo", "descricao",
-            "quantidade", "unidade", "valor", "data_recebimento", "observacoes",
+            "doador",
+            "campanha",
+            "tipo",
+            "descricao",
+            "quantidade",
+            "unidade",
+            "valor",
+            "data_recebimento",
+            "observacoes",
         ]
         widgets = {
             "data_recebimento": forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
@@ -49,19 +54,45 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
         self.fields["campanha"].queryset = Campanha.objects.all()
         self.fields["campanha"].empty_label = "Nenhuma"
         _aplicar_classes(self.fields)
+        self.fields["quantidade"].required = False
+        self.fields["unidade"].required = False
         self.fields["valor"].localize = True
-        self.fields["valor"].widget = forms.TextInput(attrs={
-            "class": "form-control", "inputmode": "decimal", "placeholder": "0,00"
-        })
+        self.fields["valor"].widget = forms.TextInput(
+            attrs={"class": "form-control", "inputmode": "decimal", "placeholder": "0,00"}
+        )
+
+    def clean(self):
+        dados = super().clean()
+        # Doacao em dinheiro nao tem quantidade nem unidade: a tela esconde os
+        # dois campos, e aqui o valor enviado por engano — ou por POST forjado —
+        # e descartado, para nao gravar "20 pacotes de dinheiro".
+        if dados.get("tipo") == TipoDoacao.DINHEIRO:
+            dados["quantidade"] = None
+            dados["unidade"] = ""
+            self.instance.quantidade = None
+            self.instance.unidade = ""
+        return dados
 
 
 class DoadorForm(FormularioDoacoesMixin, forms.ModelForm):
     cpf_cnpj = forms.CharField(label="CPF ou CNPJ", max_length=18, required=False)
+
     class Meta:
         model = Doador
         fields = [
-            "tipo", "nome", "cpf_cnpj", "telefone", "email", "recorrente",
-            "cep", "logradouro", "numero", "complemento", "bairro", "cidade", "uf",
+            "tipo",
+            "nome",
+            "cpf_cnpj",
+            "telefone",
+            "email",
+            "recorrente",
+            "cep",
+            "logradouro",
+            "numero",
+            "complemento",
+            "bairro",
+            "cidade",
+            "uf",
             "observacoes",
         ]
         widgets = {"observacoes": forms.Textarea(attrs={"rows": 2})}
@@ -83,6 +114,7 @@ class DoadorForm(FormularioDoacoesMixin, forms.ModelForm):
 
 class CampanhaForm(FormularioDoacoesMixin, forms.ModelForm):
     perfis_permitidos = (Perfil.ADMIN,)
+
     class Meta:
         model = Campanha
         fields = ["nome", "descricao", "data_inicio", "data_fim", "meta_valor"]
