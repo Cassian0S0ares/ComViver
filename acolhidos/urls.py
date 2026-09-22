@@ -13,6 +13,21 @@ urlpatterns = [
     path("acolhidos/<int:pk>/desligar/", views.DesligamentoView.as_view(), name="desligar"),
     path("acolhidos/<int:pk>/vinculo/", views.VinculoCreateView.as_view(), name="vinculo_novo"),
     path(
+        "acolhidos/<int:pk>/medicacao/",
+        views.MedicacaoCreateView.as_view(),
+        name="medicacao_nova",
+    ),
+    path(
+        "acolhidos/medicacoes/<int:pk>/editar/",
+        views.MedicacaoUpdateView.as_view(),
+        name="medicacao_editar",
+    ),
+    path(
+        "acolhidos/medicacoes/<int:pk>/remover/",
+        views.MedicacaoRemoverView.as_view(),
+        name="medicacao_remover",
+    ),
+    path(
         "acolhidos/vinculos/<int:pk>/editar/",
         views.VinculoUpdateView.as_view(),
         name="vinculo_editar",

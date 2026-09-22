@@ -4,8 +4,9 @@ from django.conf import settings
 from django.contrib import messages
 from django.core.files.storage import FileSystemStorage
 from django.db import transaction
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views import View
 from django.views.generic import DetailView, FormView, UpdateView
 from formtools.wizard.views import SessionWizardView
 
@@ -16,6 +17,7 @@ from acolhidos.forms import (
     EtapaIdentificacaoForm,
     EtapaResponsavelForm,
     EtapaSaudeEscolaForm,
+    MedicacaoForm,
     VinculoForm,
 )
 from acolhidos.models import (
@@ -101,6 +103,11 @@ class AcolhidoDetailView(PerfilRequiredMixin, RegistraAcessoFichaMixin, DetailVi
             contexto["vinculos"] = acolhido.vinculos.select_related("responsavel")
             contexto["escolaridades"] = acolhido.escolaridades.all()
             contexto["documentos"] = acolhido.documentos.all()
+            # Medicacao encerrada e historico de saude: fica com a equipe
+            # tecnica, fora do bloco de cuidado diario.
+            contexto["medicacoes_encerradas"] = acolhido.medicacoes.exclude(
+                pk__in=contexto["medicacoes_em_vigor"].values("pk")
+            ).order_by("-inicio")
 
         return contexto
 
@@ -344,3 +351,71 @@ class VinculoUpdateView(_VinculoMixin, BaseUpdateView):
     def dispatch(self, request, *args, **kwargs):
         self.acolhido = get_object_or_404(VinculoFamiliar, pk=kwargs["pk"]).acolhido
         return super().dispatch(request, *args, **kwargs)
+
+
+class _MedicacaoMixin:
+    """Cadastro de medicacao: escrita so para a equipe tecnica (spec 5.1)."""
+
+    model = Medicacao
+    form_class = MedicacaoForm
+    template_name = "acolhidos/medicacao_form.html"
+    perfis_permitidos = EQUIPE_TECNICA
+
+    def get_form_kwargs(self):
+        return super().get_form_kwargs() | {"acolhido": self.acolhido}
+
+    def get_context_data(self, **kwargs):
+        return super().get_context_data(**kwargs) | {"acolhido": self.acolhido}
+
+    def form_valid(self, form):
+        resposta = super().form_valid(form)
+        _registrar_alteracao(self.request.user, self.acolhido)
+        return resposta
+
+    def get_success_url(self):
+        return reverse("acolhidos:detalhe", args=[self.acolhido.pk])
+
+
+class MedicacaoCreateView(_MedicacaoMixin, BaseCreateView):
+    mensagem_sucesso = "Medicação registrada."
+
+    def dispatch(self, request, *args, **kwargs):
+        self.acolhido = get_object_or_404(Acolhido, pk=kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
+
+
+class MedicacaoUpdateView(_MedicacaoMixin, BaseUpdateView):
+    mensagem_sucesso = "Medicação atualizada."
+
+    def dispatch(self, request, *args, **kwargs):
+        self.acolhido = get_object_or_404(Medicacao, pk=kwargs["pk"]).acolhido
+        return super().dispatch(request, *args, **kwargs)
+
+
+class MedicacaoRemoverView(PerfilRequiredMixin, View):
+    """Remocao de lancamento errado, em pagina propria e por POST.
+
+    A exclusao e logica: o historico de medicacao de uma crianca nao pode ter
+    lacuna, mesmo quando a linha saiu da tela.
+    """
+
+    template_name = "acolhidos/medicacao_remover.html"
+    perfis_permitidos = EQUIPE_TECNICA
+
+    def dispatch(self, request, *args, **kwargs):
+        self.medicacao = get_object_or_404(Medicacao, pk=kwargs["pk"])
+        self.acolhido = self.medicacao.acolhido
+        return super().dispatch(request, *args, **kwargs)
+
+    def get(self, request, *args, **kwargs):
+        return render(
+            request,
+            self.template_name,
+            {"medicacao": self.medicacao, "acolhido": self.acolhido},
+        )
+
+    def post(self, request, *args, **kwargs):
+        self.medicacao.delete()
+        _registrar_alteracao(request.user, self.acolhido)
+        messages.success(request, f"{self.medicacao.nome} removido da ficha.")
+        return redirect("acolhidos:detalhe", pk=self.acolhido.pk)

@@ -8,6 +8,7 @@ from acolhidos.models import (
     DadosSaude,
     Destino,
     FichaAcolhimento,
+    Medicacao,
     Responsavel,
     Turno,
     VinculoFamiliar,
@@ -247,3 +248,37 @@ class VinculoForm(FormularioAcolhidos, forms.ModelForm):
         if commit:
             vinculo.save()
         return vinculo
+
+
+class MedicacaoForm(FormularioAcolhidos, forms.ModelForm):
+    """Medicamento em uso.
+
+    E o unico dado de saude que a equipe operacional enxerga: errar aqui
+    significa crianca sem remedio ou remedio a mais.
+    """
+
+    class Meta:
+        model = Medicacao
+        fields = ["nome", "dosagem", "frequencia", "inicio", "fim", "observacoes"]
+
+    def __init__(self, *args, acolhido=None, usuario=None, **kwargs):
+        self.acolhido = acolhido
+        self.usuario = usuario
+        super().__init__(*args, **kwargs)
+        self.fields["fim"].help_text = "Deixe vazio enquanto o uso continuar."
+        self.fields["frequencia"].help_text = "Como a equipe lê no plantão. Ex.: 8h e 20h."
+
+    def clean(self):
+        dados = super().clean()
+        inicio, fim = dados.get("inicio"), dados.get("fim")
+        if inicio and fim and fim < inicio:
+            self.add_error("fim", "A data de fim não pode ser anterior ao início do uso.")
+        return dados
+
+    def save(self, commit=True):
+        medicacao = super().save(commit=False)
+        if self.acolhido:
+            medicacao.acolhido = self.acolhido
+        if commit:
+            medicacao.save()
+        return medicacao
