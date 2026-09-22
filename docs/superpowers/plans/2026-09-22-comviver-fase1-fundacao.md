@@ -31,15 +31,7 @@ Duas conexões do mesmo projeto Supabase, com papéis distintos (spec §3.4):
 | Uso | Variável | Porta | Quando |
 |---|---|---|---|
 | Aplicação | `DATABASE_URL` | 6543 | Execução normal e testes |
-| Migrations | `DIRECT_URL` | 5432 | `makemigrations` e `migrate` |
 
-A troca é feita pela variável `USE_DIRECT_DB`, implementada na Task 1. No PowerShell:
-
-```powershell
-$env:USE_DIRECT_DB = "1"
-python manage.py migrate
-$env:USE_DIRECT_DB = ""
-```
 
 ---
 
