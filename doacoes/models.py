@@ -7,6 +7,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from simple_history.models import HistoricalRecords
 
+from core.managers import SoftDeleteManager, SoftDeleteQuerySet
 from core.models import Endereco, SoftDeleteModel
 
 
@@ -25,22 +26,24 @@ class TipoDoacao(models.TextChoices):
 
 
 class Doador(SoftDeleteModel, Endereco):
-    tipo = models.CharField(
-        "tipo", max_length=2, choices=TipoPessoa.choices, default=TipoPessoa.PF
-    )
+    tipo = models.CharField("tipo", max_length=2, choices=TipoPessoa.choices, default=TipoPessoa.PF)
     nome = models.CharField("nome ou razão social", max_length=150)
     cpf_cnpj = models.CharField("CPF ou CNPJ", max_length=14, blank=True)
     telefone = models.CharField("telefone", max_length=20, blank=True)
     email = models.EmailField("e-mail", blank=True)
     recorrente = models.BooleanField(
-        "doador recorrente", default=False,
+        "doador recorrente",
+        default=False,
         help_text="Marque se a pessoa ou empresa doa com regularidade.",
     )
     observacoes = models.TextField("observações", blank=True)
 
     criado_por = models.ForeignKey(
-        "accounts.Usuario", null=True, blank=True,
-        on_delete=models.PROTECT, related_name="doadores_cadastrados",
+        "accounts.Usuario",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="doadores_cadastrados",
     )
 
     class Meta:
@@ -70,14 +73,41 @@ class Doador(SoftDeleteModel, Endereco):
         return total or Decimal("0")
 
 
+class CampanhaQuerySet(SoftDeleteQuerySet):
+    def ativas(self):
+        """Campanhas que aceitam doacao hoje.
+
+        Espelha a propriedade `esta_ativa` em consulta ao banco: ja comecou,
+        ainda nao terminou e nao foi encerrada a mao.
+        """
+        hoje = timezone.localdate()
+        return self.filter(
+            models.Q(encerrada_em__isnull=True, data_inicio__lte=hoje)
+            & (models.Q(data_fim__isnull=True) | models.Q(data_fim__gte=hoje))
+        )
+
+
+class CampanhaManager(SoftDeleteManager):
+    """Manager padrao do core, com o queryset proprio das campanhas."""
+
+    def get_queryset(self):
+        return CampanhaQuerySet(self.model, using=self._db).filter(deleted_at__isnull=True)
+
+    def ativas(self):
+        return self.get_queryset().ativas()
+
+
 class Campanha(SoftDeleteModel):
     nome = models.CharField("nome", max_length=120)
     descricao = models.TextField("descrição", blank=True)
     data_inicio = models.DateField("início")
     data_fim = models.DateField("término", null=True, blank=True)
+    encerrada_em = models.DateTimeField("encerrada em", null=True, blank=True, editable=False)
     meta_valor = models.DecimalField(
         "meta em reais", max_digits=10, decimal_places=2, null=True, blank=True
     )
+
+    objects = CampanhaManager()
 
     class Meta:
         verbose_name = "campanha"
@@ -90,7 +120,7 @@ class Campanha(SoftDeleteModel):
     @property
     def esta_ativa(self) -> bool:
         hoje = timezone.localdate()
-        if self.data_inicio > hoje:
+        if self.encerrada_em is not None or self.data_inicio > hoje:
             return False
         return self.data_fim is None or self.data_fim >= hoje
 
@@ -127,8 +157,12 @@ class Doacao(SoftDeleteModel):
     """
 
     doador = models.ForeignKey(
-        Doador, null=True, blank=True, on_delete=models.SET_NULL,
-        related_name="doacoes", help_text="Deixe vazio para doação anônima.",
+        Doador,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="doacoes",
+        help_text="Deixe vazio para doação anônima.",
     )
     campanha = models.ForeignKey(
         Campanha, null=True, blank=True, on_delete=models.SET_NULL, related_name="doacoes"
@@ -148,8 +182,11 @@ class Doacao(SoftDeleteModel):
     )
     data_recebimento = models.DateField("data de recebimento", default=date.today)
     recebido_por = models.ForeignKey(
-        "accounts.Usuario", null=True, blank=True,
-        on_delete=models.PROTECT, related_name="doacoes_recebidas"
+        "accounts.Usuario",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="doacoes_recebidas",
     )
     recibo_emitido = models.BooleanField("recibo emitido", default=False)
     observacoes = models.TextField("observações", blank=True)

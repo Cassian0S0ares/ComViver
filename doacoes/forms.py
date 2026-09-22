@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import PermissionDenied
+from django.db import models
 
 from accounts.forms import FormularioAcessivelMixin
 from accounts.models import Perfil
@@ -51,7 +52,15 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
         self.fields["doador"].required = False
         self.fields["doador"].empty_label = "Anônimo"
         self.fields["campanha"].required = False
-        self.fields["campanha"].queryset = Campanha.objects.all()
+        # So campanha aberta aceita doacao nova. A campanha ja encerrada de uma
+        # doacao antiga continua na lista, senao editar o valor dela apagaria o
+        # vinculo com a arrecadacao daquele periodo.
+        campanhas = Campanha.objects.ativas()
+        if self.instance.pk and self.instance.campanha_id:
+            campanhas = Campanha.objects.filter(
+                models.Q(pk__in=campanhas.values("pk")) | models.Q(pk=self.instance.campanha_id)
+            )
+        self.fields["campanha"].queryset = campanhas
         self.fields["campanha"].empty_label = "Nenhuma"
         _aplicar_classes(self.fields)
         self.fields["quantidade"].required = False
@@ -101,6 +110,7 @@ class DoadorForm(FormularioDoacoesMixin, forms.ModelForm):
         super().__init__(*args, usuario=usuario, **kwargs)
         self.usuario = usuario
         _aplicar_classes(self.fields)
+        self.fields["cep"].widget.attrs.update({"inputmode": "numeric", "maxlength": 9, "autocomplete": "postal-code"})
 
     def clean_cpf_cnpj(self):
         numero = "".join(filter(str.isdigit, self.cleaned_data.get("cpf_cnpj", "")))
