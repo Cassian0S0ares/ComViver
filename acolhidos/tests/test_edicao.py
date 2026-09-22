@@ -59,7 +59,6 @@ class TestEditarFicha:
                 "orgao_requisitante": "Conselho Tutelar",
                 "processo_numero": "123",
                 "vara": "",
-                "medida_protetiva": "",
             },
         )
         assert acolhido.ficha.data_entrada == date(2026, 8, 1)
@@ -75,7 +74,6 @@ class TestEditarFicha:
                 "orgao_requisitante": "Conselho Tutelar",
                 "processo_numero": "123",
                 "vara": "",
-                "medida_protetiva": "",
             },
         )
         ficha.refresh_from_db()

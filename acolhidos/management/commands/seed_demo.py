@@ -115,7 +115,6 @@ class Command(BaseCommand):
                 orgao_requisitante=ORGAOS[indice % len(ORGAOS)],
                 processo_numero=f"000{1000 + indice}-56.2026.8.13.0301",
                 vara="Vara da Infância e Juventude de Itajubá",
-                medida_protetiva="Acolhimento institucional",
                 data_desligamento=hoje - timedelta(days=5) if desligado else None,
                 destino=Destino.REINTEGRACAO if desligado else "",
             )

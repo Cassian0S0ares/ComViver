@@ -30,7 +30,7 @@ class PainelView(PerfilRequiredMixin, TemplateView):
                 "titulo": "Acolhidos",
                 "valor": Acolhido.objects.filter(status=StatusAcolhido.ACOLHIDO).count(),
                 "descricao": "em acolhimento hoje",
-                "icone": "people-fill",
+                "icone": "emoji-smile",
                 "url": reverse("acolhidos:lista"),
             }
         ]

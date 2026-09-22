@@ -61,7 +61,18 @@ class EtapaIdentificacaoForm(FormularioAcolhidos, forms.ModelForm):
         cpf.max_length = 14
         cpf.validators = [v for v in cpf.validators if not isinstance(v, MaxLengthValidator)]
         cpf.widget.attrs.update({"maxlength": 14, "inputmode": "numeric"})
-        self.fields["foto"].help_text = "JPG, PNG ou WEBP, até 10 MB."
+        foto = self.fields["foto"]
+        # FileInput no lugar do widget padrao: o padrao imprime o caminho do
+        # arquivo e uma caixa "Limpar" que confundem. Sem arquivo novo, o
+        # formulario mantem a foto que ja existe.
+        foto.widget = forms.FileInput(
+            attrs={
+                "class": "input-arquivo",
+                "accept": "image/jpeg,image/png,image/webp",
+            }
+        )
+        foto.label = "Trocar a foto" if self.instance.pk and self.instance.foto else "Foto"
+        foto.help_text = "JPG, PNG ou WEBP, até 10 MB."
 
     def clean_nascimento(self):
         nascimento = self.cleaned_data["nascimento"]

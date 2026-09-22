@@ -14,7 +14,7 @@ def menu(request):
     ]
 
     # Todos os perfis veem a lista; o recorte de sigilo acontece dentro da ficha.
-    itens.append({"rotulo": "Acolhidos", "url": reverse("acolhidos:lista"), "icone": "people-fill"})
+    itens.append({"rotulo": "Acolhidos", "url": reverse("acolhidos:lista"), "icone": "emoji-smile"})
 
     # Os demais itens de dominio entram nas fases 3 a 5, cada um com seu recorte.
 
