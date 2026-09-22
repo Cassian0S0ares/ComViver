@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.db.models import Q
+from django.urls import reverse
 from django.views.generic import CreateView, ListView, TemplateView, UpdateView
 
 from accounts.models import Perfil, Usuario
@@ -22,7 +23,31 @@ class PainelView(PerfilRequiredMixin, TemplateView):
         return contexto
 
     def _montar_cartoes(self) -> list[dict]:
-        cartoes = []
+        from acolhidos.models import Acolhido, Medicacao, StatusAcolhido
+
+        cartoes = [
+            {
+                "titulo": "Acolhidos",
+                "valor": Acolhido.objects.filter(status=StatusAcolhido.ACOLHIDO).count(),
+                "descricao": "em acolhimento hoje",
+                "icone": "people-fill",
+                "url": reverse("acolhidos:lista"),
+            }
+        ]
+
+        if self.request.user.pode_ver_ficha_completa():
+            cartoes.append(
+                {
+                    "titulo": "Medicações do dia",
+                    "valor": Medicacao.em_vigor.filter(
+                        acolhido__status=StatusAcolhido.ACOLHIDO,
+                        acolhido__deleted_at__isnull=True,
+                    ).count(),
+                    "descricao": "em uso hoje",
+                    "icone": "capsule",
+                    "url": reverse("acolhidos:lista"),
+                }
+            )
 
         if self.request.user.pode_gerenciar_usuarios():
             cartoes.append(
@@ -31,6 +56,7 @@ class PainelView(PerfilRequiredMixin, TemplateView):
                     "valor": Usuario.objects.filter(is_active=True).count(),
                     "descricao": "com acesso ao sistema",
                     "icone": "people",
+                    "url": reverse("accounts:usuario_list"),
                 }
             )
 

@@ -10,6 +10,7 @@ urlpatterns = [
     # desenvolvimento: servir sem checagem vazaria em qualquer demonstracao.
     path("media/<path:caminho>", servir_media_protegida, name="media_protegida"),
     path("", include("accounts.urls")),
+    path("", include("acolhidos.urls")),
     path("", include("core.urls")),
 ]
 
