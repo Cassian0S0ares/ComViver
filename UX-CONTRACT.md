@@ -31,8 +31,12 @@ Não há seleção em massa nem entrada de datas nesta fase.
 ## Navegação de dados
 
 Paginação no servidor: 25 pessoas por página, ordenação estável por nome,
-sobrenome, usuário e chave. Busca e filtros são confirmados por Enter ou Filtrar,
-sem pedidos assíncronos por tecla. URL contém q, perfil, status e page; estes
+sobrenome, usuário e chave. Nas listas de equipe e de acolhidos, busca e filtros são
+confirmados por Enter ou Filtrar, sem pedidos assíncronos por tecla. A tela de
+medicações é a exceção: a tabela se atualiza enquanto a pessoa digita, com pedido
+ao servidor a cada 250 ms de pausa, trocando apenas a região `data-lista` e a
+contagem; o filtro de situação envia sozinho e o botão Filtrar existe só dentro
+de `noscript`. Falha de rede cai no envio normal do formulário. URL contém q, perfil, status e page; estes
 parâmetros descrevem somente a lista de equipe administrativa. Limpar busca
 submete imediatamente, preserva filtros e reinicia a página. Página fora do
 intervalo é ajustada pelo servidor. Estado vazio oferece Limpar filtros.

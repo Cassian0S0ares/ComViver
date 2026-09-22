@@ -241,6 +241,10 @@ class Medicacao(SoftDeleteModel):
         verbose_name = "medicação"
         verbose_name_plural = "medicações"
         ordering = ["nome"]
+        # Sem isto, `em_vigor` viraria o manager padrao e `acolhido.medicacoes`
+        # esconderia as medicacoes ja encerradas.
+        base_manager_name = "objects"
+        default_manager_name = "objects"
 
     def __str__(self) -> str:
         return f"{self.nome} {self.dosagem}"
