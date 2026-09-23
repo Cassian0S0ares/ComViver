@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import PermissionDenied
+from django.core.validators import MaxLengthValidator
 
 from accounts.forms import FormularioAcessivelMixin
 from accounts.models import Perfil
@@ -67,6 +68,14 @@ class VoluntarioForm(FormularioVoluntariosMixin, forms.ModelForm):
         _aplicar_classes(self.fields)
         self.fields["funcoes"].widget.attrs.pop("class", None)
         self.fields["funcoes"].queryset = Funcao.objects.all()
+
+        # O modelo guarda so os 11 digitos, mas o campo aceita a mascara
+        # digitada ("123.456.789-01", 14 caracteres); sem isso o validador de
+        # tamanho do campo barraria a mascara antes de clean_cpf limpa-la.
+        cpf = self.fields["cpf"]
+        cpf.max_length = 14
+        cpf.validators = [v for v in cpf.validators if not isinstance(v, MaxLengthValidator)]
+        cpf.widget.attrs.update({"maxlength": 14, "inputmode": "numeric"})
 
         # Uma caixa por combinacao de dia e turno.
         selecionadas = set()
