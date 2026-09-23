@@ -1,6 +1,8 @@
 import pytest
 from django.urls import reverse
 
+from voluntarios.factories import VoluntarioFactory
+
 pytestmark = pytest.mark.django_db
 
 
@@ -11,6 +13,13 @@ class TestPermissoes:
     def test_todos_veem_a_lista(self, client, request, fixture_usuario):
         client.force_login(request.getfixturevalue(fixture_usuario))
         assert client.get(reverse("voluntarios:lista")).status_code == 200
+
+    def test_operacional_ve_detalhe_do_voluntario(self, client, usuario_operacional):
+        """So testavel com escalas.models.Alocacao existindo (Fase 4, Tarefa 2)."""
+        client.force_login(usuario_operacional)
+        voluntario = VoluntarioFactory()
+        url = reverse("voluntarios:detalhe", args=[voluntario.pk])
+        assert client.get(url).status_code == 200
 
     def test_tecnico_nao_cadastra_voluntario(self, client, usuario_tecnico):
         client.force_login(usuario_tecnico)
