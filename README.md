@@ -25,6 +25,8 @@ Preencha `.env` localmente:
 - `ALLOWED_HOSTS`: `localhost,127.0.0.1` no desenvolvimento.
 - `DATABASE_URL`: URI PostgreSQL direta, porta 5432, fornecida pelo Supabase.
 - `CSRF_TRUSTED_ORIGINS`: domínio HTTPS em produção.
+- `EMAIL_URL`: servidor SMTP para enviar boas-vindas e recuperação de senha.
+- `DEFAULT_FROM_EMAIL`: remetente exibido nos e-mails.
 
 Uma chave pode ser gerada no seu terminal com:
 
@@ -41,8 +43,21 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+Fotos e documentos enviados a partir desta versão ficam no PostgreSQL. Depois de
+atualizar uma instalação que já tenha arquivos em `media/`, execute a importação
+**no computador ou servidor que possui essa pasta**, após `migrate`:
+
+```powershell
+python manage.py importar_midia
+```
+
+O comando pode ser repetido. Ele informa arquivos referenciados no banco que não
+foram encontrados na pasta local. Inclua o PostgreSQL nos backups das imagens.
+
 Abra `http://127.0.0.1:8000/`. O superusuário inicial tem perfil Administrador.
-Novas pessoas cadastradas pela interface precisam trocar a senha no primeiro acesso.
+Novas pessoas cadastradas pela interface recebem um e-mail com o endereço de
+acesso e a senha provisória, que precisam trocar no primeiro acesso. Sem
+`EMAIL_URL`, o e-mail aparece apenas no terminal do servidor.
 
 ## Dados de demonstração
 

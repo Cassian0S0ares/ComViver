@@ -4,6 +4,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.core.files.storage import default_storage
 from django.http import FileResponse, Http404
 
 # Prefixos cujo conteudo e vedado ao perfil Operacional.
@@ -16,7 +17,7 @@ TIPOS_EM_LINHA = {"image/jpeg", "image/png", "image/gif", "image/webp", "applica
 
 @login_required
 def servir_media_protegida(request, caminho: str):
-    """Entrega arquivo de `media/` apenas a quem pode ve-lo.
+    """Entrega uploads do banco (ou arquivos locais antigos) a quem pode ve-los.
 
     Arquivo em diretorio publico ficaria acessivel a quem descobrisse a URL —
     e aqui isso significaria a foto de uma crianca acolhida exposta sem login.
@@ -34,7 +35,7 @@ def servir_media_protegida(request, caminho: str):
     if relativo.startswith(PREFIXOS_SIGILOSOS) and not request.user.pode_ver_ficha_completa():
         raise PermissionDenied("Seu perfil não tem acesso a este documento.")
 
-    if not destino.is_file():
+    if not default_storage.exists(relativo):
         raise Http404("Arquivo não encontrado.")
 
     tipo, _ = mimetypes.guess_type(destino.name)
@@ -44,7 +45,7 @@ def servir_media_protegida(request, caminho: str):
     # renderizado: renderizado, rodaria script na mesma origem do sistema, com
     # a sessao de quem abriu.
     resposta = FileResponse(
-        destino.open("rb"),
+        default_storage.open(relativo, "rb"),
         content_type=tipo,
         as_attachment=tipo not in TIPOS_EM_LINHA,
         filename=destino.name,

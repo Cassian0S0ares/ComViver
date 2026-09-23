@@ -1,0 +1,17 @@
+<div class="campaign-goal-row" data-meta-row data-item-goal data-unit-pair>
+  {{ meta_form.id }}
+  {% if meta_form.non_field_errors %}<div class="field-error" role="alert">{{ meta_form.non_field_errors }}</div>{% endif %}
+  <div class="campaign-goal-fields">
+    {% for field in meta_form.visible_fields %}
+      {% if field.name != 'DELETE' %}
+        <div class="field">
+          <label for="{{ field.id_for_label }}">{{ field.label }}<span class="required" aria-hidden="true"> *</span></label>
+          {{ field }}
+          {% if field.errors %}<div class="field-error" id="{{ field.id_for_label }}_error">{{ field.errors }}</div>{% endif %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+  <label class="campaign-goal-remove" for="{{ meta_form.DELETE.id_for_label }}" data-remove-fallback>{{ meta_form.DELETE }} Remover esta meta ao salvar</label>
+  <button class="button button-secondary button-small" type="button" disabled data-enhancement data-remove-meta hidden>Remover meta</button>
+</div>

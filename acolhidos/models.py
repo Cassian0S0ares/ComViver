@@ -19,6 +19,17 @@ class Sexo(models.TextChoices):
     OUTRO = "O", "Outro"
 
 
+class TipoSanguineo(models.TextChoices):
+    A_POSITIVO = "A+", "A+"
+    A_NEGATIVO = "A-", "A-"
+    B_POSITIVO = "B+", "B+"
+    B_NEGATIVO = "B-", "B-"
+    AB_POSITIVO = "AB+", "AB+"
+    AB_NEGATIVO = "AB-", "AB-"
+    O_POSITIVO = "O+", "O+"
+    O_NEGATIVO = "O-", "O-"
+
+
 class Acolhido(SoftDeleteModel):
     """Crianca ou adolescente em acolhimento institucional.
 
@@ -202,7 +213,9 @@ class FichaAcolhimento(SoftDeleteModel):
 
 class DadosSaude(SoftDeleteModel):
     acolhido = models.OneToOneField(Acolhido, on_delete=models.CASCADE, related_name="saude")
-    tipo_sanguineo = models.CharField("tipo sanguíneo", max_length=3, blank=True)
+    tipo_sanguineo = models.CharField(
+        "tipo sanguíneo", max_length=3, choices=TipoSanguineo.choices, blank=True
+    )
     alergias = models.TextField("alergias", blank=True)
     condicoes = models.TextField("condições de saúde", blank=True)
     plano_saude = models.CharField("plano de saúde", max_length=100, blank=True)
@@ -254,6 +267,7 @@ class Turno(models.TextChoices):
     MANHA = "MANHA", "Manhã"
     TARDE = "TARDE", "Tarde"
     NOITE = "NOITE", "Noite"
+    INTEGRAL = "INTEGRAL", "Integral"
 
 
 class Escolaridade(SoftDeleteModel):

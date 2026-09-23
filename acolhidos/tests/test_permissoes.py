@@ -61,14 +61,16 @@ class TestFichaSigilosa:
     """Matriz da spec 5.1, linha a linha."""
 
     @pytest.mark.parametrize("fixture_usuario", ["usuario_admin", "usuario_tecnico"])
-    def test_perfil_autorizado_ve_o_motivo(
+    def test_perfil_autorizado_ve_o_processo(
         self, client, request, fixture_usuario, acolhido_completo
     ):
+        # O motivo saiu da ficha; o processo segue como dado sigiloso visivel
+        # so para a equipe tecnica.
         client.force_login(request.getfixturevalue(fixture_usuario))
         conteudo = client.get(
             reverse("acolhidos:detalhe", args=[acolhido_completo.pk])
         ).content.decode()
-        assert "Negligência familiar grave" in conteudo
+        assert "0001234-56.2026.8.13.0301" in conteudo
 
     def test_operacional_nao_ve_o_motivo(self, client, usuario_operacional, acolhido_completo):
         client.force_login(usuario_operacional)

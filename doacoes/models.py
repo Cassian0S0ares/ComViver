@@ -25,6 +25,45 @@ class TipoDoacao(models.TextChoices):
     OUTRO = "OUTRO", "Outro"
 
 
+UNIDADES_DOACAO = [
+    ("unidades", "Unidade"),
+    ("pacotes", "Pacote"),
+    ("caixas", "Caixa"),
+    ("peças", "Peças"),
+    ("pares", "Par"),
+    ("sacos", "Saco"),
+    ("fardos", "Fardo"),
+    ("quilos", "Quilo"),
+    ("litros", "Litro"),
+    ("horas", "Hora"),
+]
+
+UNIDADES_POR_TIPO = {
+    TipoDoacao.ALIMENTO: (
+        "unidades",
+        "pacotes",
+        "caixas",
+        "sacos",
+        "fardos",
+        "quilos",
+        "litros",
+    ),
+    TipoDoacao.VESTUARIO: ("unidades", "peças", "pares"),
+    TipoDoacao.MATERIAL: (
+        "unidades",
+        "pacotes",
+        "caixas",
+        "peças",
+        "pares",
+        "sacos",
+        "quilos",
+        "litros",
+    ),
+    TipoDoacao.SERVICO: ("unidades", "horas"),
+    TipoDoacao.OUTRO: tuple(valor for valor, _ in UNIDADES_DOACAO),
+}
+
+
 class Doador(SoftDeleteModel, Endereco):
     tipo = models.CharField("tipo", max_length=2, choices=TipoPessoa.choices, default=TipoPessoa.PF)
     nome = models.CharField("nome ou razão social", max_length=150)
@@ -137,6 +176,46 @@ class Campanha(SoftDeleteModel):
             return 0
         return int(self.arrecadado / self.meta_valor * 100)
 
+    @property
+    def metas_com_progresso(self) -> list[dict]:
+        metas = []
+        if self.meta_valor:
+            arrecadado = self.arrecadado
+            percentual = int(arrecadado / self.meta_valor * 100)
+            metas.append(
+                {
+                    "tipo": TipoDoacao.DINHEIRO,
+                    "rotulo": "Dinheiro",
+                    "alvo": self.meta_valor,
+                    "recebido": arrecadado,
+                    "unidade": "",
+                    "percentual": percentual,
+                    "progresso": min(percentual, 100),
+                }
+            )
+        totais = {
+            (linha["tipo"], linha["unidade"]): linha["total"] or 0
+            for linha in self.doacoes.filter(deleted_at__isnull=True)
+            .exclude(tipo=TipoDoacao.DINHEIRO)
+            .values("tipo", "unidade")
+            .annotate(total=Sum("quantidade"))
+        }
+        for meta in self.metas_itens.all():
+            recebido = totais.get((meta.tipo, meta.unidade), 0)
+            percentual = int(recebido / meta.quantidade * 100)
+            metas.append(
+                {
+                    "tipo": meta.tipo,
+                    "rotulo": meta.get_tipo_display(),
+                    "alvo": meta.quantidade,
+                    "recebido": recebido,
+                    "unidade": meta.unidade,
+                    "percentual": percentual,
+                    "progresso": min(percentual, 100),
+                }
+            )
+        return metas
+
     def clean(self):
         super().clean()
         erros = {}
@@ -146,6 +225,40 @@ class Campanha(SoftDeleteModel):
             erros["meta_valor"] = "A meta precisa ser maior que zero."
         if erros:
             raise ValidationError(erros)
+
+
+class MetaItemCampanha(models.Model):
+    campanha = models.ForeignKey(Campanha, on_delete=models.CASCADE, related_name="metas_itens")
+    tipo = models.CharField(
+        "tipo de item",
+        max_length=10,
+        choices=[opcao for opcao in TipoDoacao.choices if opcao[0] != TipoDoacao.DINHEIRO],
+    )
+    quantidade = models.PositiveIntegerField("quantidade desejada")
+    unidade = models.CharField("unidade", max_length=30, choices=UNIDADES_DOACAO)
+
+    class Meta:
+        verbose_name = "meta de item"
+        verbose_name_plural = "metas de itens"
+        ordering = ["pk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["campanha", "tipo", "unidade"], name="meta_item_campanha_unica"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.quantidade} {self.unidade} de {self.get_tipo_display()}"
+
+    def clean(self):
+        super().clean()
+        if self.quantidade is not None and self.quantidade < 1:
+            raise ValidationError({"quantidade": "A quantidade precisa ser maior que zero."})
+
+        if self.tipo and self.unidade and self.unidade not in UNIDADES_POR_TIPO.get(self.tipo, ()):
+            raise ValidationError(
+                {"unidade": "Esta unidade não é compatível com o tipo escolhido."}
+            )
 
 
 class Doacao(SoftDeleteModel):
@@ -212,11 +325,20 @@ class Doacao(SoftDeleteModel):
                 erros["valor"] = "Informe o valor da doação em dinheiro."
             elif self.valor <= 0:
                 erros["valor"] = "O valor precisa ser maior que zero."
-        elif not self.descricao.strip():
-            erros["descricao"] = "Descreva o que foi doado."
+        elif self.tipo:
+            if not self.descricao.strip():
+                erros["descricao"] = "Descreva o que foi doado."
+            if self.quantidade is None:
+                erros["quantidade"] = "Informe a quantidade doada."
+            elif self.quantidade <= 0:
+                erros["quantidade"] = "A quantidade precisa ser maior que zero."
+            elif self.quantidade % 1 != 0:
+                erros["quantidade"] = "A quantidade precisa ser um número inteiro."
+            if not self.unidade:
+                erros["unidade"] = "Selecione a unidade da doação."
+            elif self.unidade not in UNIDADES_POR_TIPO.get(self.tipo, ()):
+                erros["unidade"] = "Esta unidade não é compatível com o tipo escolhido."
 
-        if self.quantidade is not None and self.quantidade <= 0:
-            erros["quantidade"] = "A quantidade precisa ser maior que zero."
         if self.valor is not None and self.valor <= 0:
             erros["valor"] = "O valor precisa ser maior que zero."
         if self.data_recebimento and self.data_recebimento > timezone.localdate():

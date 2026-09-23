@@ -4,3 +4,28 @@
 .filter-bar>select.form-select{width:auto;flex:0 1 220px}@media(max-width:700px){.filter-bar>select.form-select{width:100%;flex-basis:100%}}
 
 .campaign-items+.campaign-donations{margin-top:var(--space-xl)}
+
+.campaign-goals{border-top:1px solid var(--color-line);padding-top:var(--space-lg);margin-top:var(--space-sm)}
+.campaign-goals h3{font-size:1rem;margin-bottom:var(--space-sm)}
+.campaign-goals>p{margin-bottom:var(--space-lg)}
+.campaign-goal-list{display:grid;gap:var(--space-md);margin-bottom:var(--space-lg)}
+.campaign-goal-row{padding:var(--space-md);border:1px solid var(--color-line);border-radius:var(--radius-sm);background:var(--color-paper)}
+.campaign-goal-row[hidden],.campaign-goal-row [hidden],.campaign-goal-actions [hidden]{display:none}
+.campaign-goal-money h4{font-size:.9rem;margin-bottom:var(--space-md)}
+.campaign-goal-money .field{max-width:280px}
+.campaign-goal-row [data-remove-meta]{margin-top:var(--space-sm)}
+.campaign-goal-actions{display:flex;flex-wrap:wrap;gap:var(--space-sm)}
+.campaign-goal-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.65fr) minmax(0,1fr);gap:var(--space-md)}
+.campaign-goal-fields .field{margin-bottom:var(--space-sm)}
+.campaign-goal-remove{display:inline-flex;align-items:center;gap:var(--space-sm);font-size:.85rem;min-height:44px;cursor:pointer}
+.campaign-goal-remove input{width:20px;height:20px}
+@media(max-width:700px){.campaign-goal-fields{grid-template-columns:minmax(0,1fr);gap:0}}
+.campaign-progress{padding:var(--space-lg);border:1px solid var(--color-line);border-radius:var(--radius-md);background:var(--color-surface);margin-bottom:var(--space-lg)}
+.campaign-progress h2,.campaign-progress h4{font-size:1rem;margin-bottom:var(--space-md)}
+.campaign-progress-list{list-style:none;padding:0;margin:0;display:grid;gap:var(--space-lg)}
+.campaign-progress-list li{display:grid;gap:var(--space-xs)}
+.campaign-progress-heading{display:flex;justify-content:space-between;flex-wrap:wrap;gap:var(--space-xs) var(--space-md)}
+.campaign-progress-heading strong{font-variant-numeric:tabular-nums}
+.campaign-progress-list progress{width:100%;height:10px;accent-color:var(--color-success)}
+.campaign-progress-list small{color:var(--color-muted)}
+.campaign-card .campaign-progress{padding:var(--space-md);margin:var(--space-md) 0 0;width:100%;background:var(--color-paper)}

@@ -100,3 +100,19 @@ class Endereco(models.Model):
         if not self.logradouro:
             return ""
         return f"{self.logradouro}, {self.numero} - {self.bairro}, {self.cidade}/{self.uf}"
+
+
+class ArquivoEnviado(models.Model):
+    """Conteudo dos uploads, compartilhado por todas as instancias do sistema."""
+
+    nome = models.CharField(max_length=255, unique=True)
+    conteudo = models.BinaryField(editable=False)
+    tamanho = models.PositiveIntegerField()
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "arquivo enviado"
+        verbose_name_plural = "arquivos enviados"
+
+    def __str__(self) -> str:
+        return self.nome

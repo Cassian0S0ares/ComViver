@@ -1,0 +1,18 @@
+{% with metas=campanha.metas_com_progresso %}
+<section class="campaign-progress" aria-label="Metas da campanha">
+  {% if compact %}<h4>Metas da campanha</h4>{% else %}<h2>Metas da campanha</h2>{% endif %}
+  {% if metas %}
+    <ul class="campaign-progress-list">
+      {% for meta in metas %}
+        <li>
+          <div class="campaign-progress-heading"><span>{{ meta.rotulo }}</span><strong>{% if meta.tipo == 'DINHEIRO' %}R$ {{ meta.recebido|floatformat:'2g' }} / R$ {{ meta.alvo|floatformat:'2g' }}{% else %}{{ meta.recebido|floatformat:'-2' }} / {{ meta.alvo }} {{ meta.unidade }}{% endif %}</strong></div>
+          <progress max="100" value="{{ meta.progresso }}" aria-label="Progresso da meta de {{ meta.rotulo }} da campanha {{ campanha.nome }}"></progress>
+          <small>{{ meta.percentual }}% alcançado</small>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="muted small">Nenhuma meta definida.</p>
+  {% endif %}
+</section>
+{% endwith %}

@@ -10,9 +10,20 @@ from acolhidos.models import (
     FichaAcolhimento,
     Medicacao,
     Responsavel,
+    TipoSanguineo,
     Turno,
     VinculoFamiliar,
 )
+
+NATURALIDADES = [
+    ("Cruzeiro", "Cruzeiro"),
+    ("Lavrinhas", "Lavrinhas"),
+    ("Cachoeira Paulista", "Cachoeira Paulista"),
+    ("Passa Quatro", "Passa Quatro"),
+    ("Silveiras", "Silveiras"),
+    ("Lorena", "Lorena"),
+    ("Guaratinguetá", "Guaratinguetá"),
+]
 
 
 def _aplicar_classes(campos):
@@ -40,6 +51,12 @@ class FormularioAcolhidos(FormularioAcessivelMixin):
 
 
 class EtapaIdentificacaoForm(FormularioAcolhidos, forms.ModelForm):
+    naturalidade = forms.ChoiceField(
+        label="Naturalidade",
+        choices=[("", "Selecione a cidade"), *NATURALIDADES],
+        required=False,
+    )
+
     class Meta:
         model = Acolhido
         fields = [
@@ -57,11 +74,30 @@ class EtapaIdentificacaoForm(FormularioAcolhidos, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["nascimento"].help_text = "Informe uma data para idade menor que 18 anos."
+        self.fields["nascimento"].widget.attrs["max"] = timezone.localdate().isoformat()
+        # Cadastros antigos podem conter outra cidade. Mantenha o valor ao editar.
+        atual = self.instance.naturalidade if self.instance.pk else ""
+        if atual and atual not in dict(NATURALIDADES):
+            self.fields["naturalidade"].choices = [
+                *self.fields["naturalidade"].choices,
+                (atual, atual),
+            ]
         # O CPF chega com ou sem mascara; a limpeza guarda so os 11 digitos.
         cpf = self.fields["cpf"]
         cpf.max_length = 14
         cpf.validators = [v for v in cpf.validators if not isinstance(v, MaxLengthValidator)]
         cpf.widget.attrs.update({"maxlength": 14, "inputmode": "numeric"})
+        # RG, certidao e cartao SUS tambem aceitam pontuacao; guardamos so os
+        # caracteres que contam. O maxlength deixa folga para a mascara.
+        self.fields["rg"].widget.attrs.update({"maxlength": 13})
+        self.fields["rg"].help_text = "7 a 9 dígitos (o último pode ser X)."
+        self.fields["certidao_nascimento"].widget.attrs.update(
+            {"maxlength": 40, "inputmode": "numeric"}
+        )
+        self.fields["certidao_nascimento"].help_text = "Matrícula com 32 dígitos."
+        self.fields["cartao_sus"].widget.attrs.update({"maxlength": 18, "inputmode": "numeric"})
+        self.fields["cartao_sus"].help_text = "15 dígitos."
         foto = self.fields["foto"]
         # FileInput no lugar do widget padrao: o padrao imprime o caminho do
         # arquivo e uma caixa "Limpar" que confundem. Sem arquivo novo, o
@@ -80,11 +116,14 @@ class EtapaIdentificacaoForm(FormularioAcolhidos, forms.ModelForm):
         hoje = timezone.localdate()
         if nascimento > hoje:
             raise forms.ValidationError("A data de nascimento não pode ser no futuro.")
-        if hoje.year - nascimento.year > 21:
-            raise forms.ValidationError(
-                "Idade acima de 21 anos. Confira a data — o acolhimento é de "
-                "crianças e adolescentes."
-            )
+        idade = hoje.year - nascimento.year - (
+            (hoje.month, hoje.day) < (nascimento.month, nascimento.day)
+        )
+        # Um registro histórico pode completar 18 anos depois do cadastro.
+        # Nesse caso, permita corrigir outros dados sem alterar o nascimento.
+        nascimento_antigo = self.instance.nascimento if self.instance.pk else None
+        if idade >= 18 and nascimento != nascimento_antigo:
+            raise forms.ValidationError("A pessoa acolhida deve ter menos de 18 anos.")
         return nascimento
 
     def clean_cpf(self):
@@ -92,6 +131,27 @@ class EtapaIdentificacaoForm(FormularioAcolhidos, forms.ModelForm):
         if cpf and len(cpf) != 11:
             raise forms.ValidationError("O CPF precisa ter 11 dígitos.")
         return cpf
+
+    def clean_rg(self):
+        rg = "".join(c for c in (self.cleaned_data.get("rg") or "").upper() if c.isalnum())
+        formato_ok = 7 <= len(rg) <= 9 and rg[:-1].isdigit() and (rg[-1].isdigit() or rg[-1] == "X")
+        if rg and not formato_ok:
+            raise forms.ValidationError(
+                "O RG precisa ter de 7 a 9 dígitos (o último pode ser X)."
+            )
+        return rg
+
+    def clean_certidao_nascimento(self):
+        certidao = _somente_digitos(self.cleaned_data.get("certidao_nascimento"))
+        if certidao and len(certidao) != 32:
+            raise forms.ValidationError("A matrícula da certidão precisa ter 32 dígitos.")
+        return certidao
+
+    def clean_cartao_sus(self):
+        cartao = _somente_digitos(self.cleaned_data.get("cartao_sus"))
+        if cartao and len(cartao) != 15:
+            raise forms.ValidationError("O cartão SUS precisa ter 15 dígitos.")
+        return cartao
 
 
 class EtapaAcolhimentoForm(FormularioAcolhidos, forms.ModelForm):
@@ -112,14 +172,58 @@ class EtapaAcolhimentoForm(FormularioAcolhidos, forms.ModelForm):
         return entrada
 
 
+class EtapaAcolhimentoCadastroForm(EtapaAcolhimentoForm):
+    class Meta(EtapaAcolhimentoForm.Meta):
+        fields = ["data_entrada", "orgao_requisitante", "processo_numero", "vara"]
+
+
 class EtapaSaudeEscolaForm(FormularioAcolhidos, forms.ModelForm):
     escola = forms.CharField(label="Escola", max_length=150, required=False)
-    serie = forms.CharField(label="Série", max_length=50, required=False)
+    serie = forms.ChoiceField(
+        label="Série",
+        required=False,
+        choices=[
+            ("", "Selecione a série"),
+            ("Educação Infantil", [
+                ("Maternal", "Maternal"),
+                ("Jardim I", "Jardim I"),
+                ("Jardim II", "Jardim II"),
+                ("Pré I", "Pré I"),
+                ("Pré II", "Pré II"),
+            ]),
+            ("Ensino Fundamental", [
+                (f"{ano}º ano do Ensino Fundamental", f"{ano}º ano")
+                for ano in range(1, 10)
+            ]),
+            ("Ensino Médio", [
+                (f"{ano}º ano do Ensino Médio", f"{ano}º ano")
+                for ano in range(1, 4)
+            ]),
+        ],
+    )
     turno = forms.ChoiceField(label="Turno", required=False, choices=[("", "—"), *Turno.choices])
 
     class Meta:
         model = DadosSaude
         fields = ["tipo_sanguineo", "alergias", "condicoes", "plano_saude"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["tipo_sanguineo"].choices = [("", "Não informado"), *TipoSanguineo.choices]
+        # Uma alergia por linha. Com JavaScript, o textarea vira uma lista em
+        # que cada alergia e adicionada por um botao (comviver.js).
+        alergias = self.fields["alergias"]
+        alergias.widget.attrs.update({"data-itens": "alergia"})
+        alergias.help_text = "Uma alergia por linha."
+
+    def clean_alergias(self):
+        vistas, itens = set(), []
+        for linha in (self.cleaned_data.get("alergias") or "").splitlines():
+            item = " ".join(linha.split())
+            if item and item.casefold() not in vistas:
+                vistas.add(item.casefold())
+                itens.append(item)
+        return "\n".join(itens)
 
     def clean(self):
         dados = super().clean()
@@ -132,7 +236,21 @@ class EtapaResponsavelForm(FormularioAcolhidos, forms.Form):
     nome = forms.CharField(label="Nome do responsável", max_length=150)
     cpf = forms.CharField(label="CPF", max_length=14, required=False)
     telefone = forms.CharField(label="Telefone", max_length=20, required=False)
-    parentesco = forms.CharField(label="Parentesco", max_length=50)
+    parentesco = forms.ChoiceField(
+        label="Parentesco",
+        choices=[
+            ("", "Selecione o parentesco"),
+            ("Mãe", "Mãe"),
+            ("Pai", "Pai"),
+            ("Avó", "Avó"),
+            ("Avô", "Avô"),
+            ("Tio", "Tio"),
+            ("Tia", "Tia"),
+            ("Irmão", "Irmão"),
+            ("Primo", "Primo"),
+            ("Responsável Legal", "Responsável Legal"),
+        ],
+    )
     e_guardiao = forms.BooleanField(label="É guardião legal", required=False)
     autorizado_visita = forms.BooleanField(
         label="Autorizado a visitar", required=False, initial=True

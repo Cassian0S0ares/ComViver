@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block titulo %}Estatísticas dos acolhidos{% endblock %}
+{% block cabecalho %}<a href="{% url 'acolhidos:lista' %}">Acolhidos</a> <span>/</span> Estatísticas{% endblock %}
+{% block conteudo %}
+{% with e=estatisticas %}
+<a class="back-link" href="{% url 'acolhidos:lista' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar para os acolhidos</a>
+<div class="page-heading stat-page-heading">
+  <div>
+    <span class="eyebrow">ACOLHIMENTO</span>
+    <h1>Estatísticas</h1>
+    <p class="muted">Um panorama dos acolhidos, sem identificar ninguém.</p>
+  </div>
+  <form class="stat-filter" method="get">
+    <label for="situacao">Situação</label>
+    <select class="form-select" name="situacao" id="situacao" onchange="this.form.requestSubmit()">
+      {% for valor, rotulo in situacoes %}<option value="{{ valor }}" {% if situacao == valor %}selected{% endif %}>{{ rotulo }}</option>{% endfor %}
+    </select>
+    <noscript><button class="button button-secondary" type="submit">Aplicar</button></noscript>
+  </form>
+</div>
+{% if e.total %}
+<section class="stat-overview" aria-labelledby="stat-overview-title">
+  <div class="stat-section-heading">
+    <div><span class="eyebrow">VISÃO GERAL</span><h2 id="stat-overview-title">Resumo da seleção</h2></div>
+    <p class="muted">Dados conforme a situação selecionada.</p>
+  </div>
+  <ul class="stat-tiles" aria-label="Indicadores gerais">
+    <li class="stat-tile-featured">
+      <span class="stat-tile-icon"><i class="bi bi-people" aria-hidden="true"></i></span>
+      <span class="stat-tile-label">Total de acolhidos</span>
+      <strong class="stat-tile-number">{{ e.total }}</strong>
+      <span class="stat-tile-caption">Na situação selecionada</span>
+    </li>
+    <li class="metric-surface stat-tile">
+      <span class="metric-label"><i class="bi bi-cake2" aria-hidden="true"></i> Idade média</span>
+      <strong class="stat-tile-number">{{ e.idade_media|floatformat:1 }} <small>anos</small></strong>
+    </li>
+    <li class="metric-surface stat-tile">
+      <span class="metric-label"><i class="bi bi-hourglass-split" aria-hidden="true"></i> Permanência média</span>
+      <strong class="stat-tile-number">{% if e.permanencia_media is not None %}{{ e.permanencia_media }} <small>{{ e.permanencia_media|pluralize:'mês,meses' }}</small>{% else %}—{% endif %}</strong>
+    </li>
+    <li class="metric-surface stat-tile">
+      <span class="metric-label"><i class="bi bi-exclamation-diamond" aria-hidden="true"></i> Com alergia</span>
+      <strong class="stat-tile-number">{{ e.com_alergia }}</strong>
+    </li>
+    <li class="metric-surface stat-tile">
+      <span class="metric-label"><i class="bi bi-capsule" aria-hidden="true"></i> Com medicação em uso</span>
+      <strong class="stat-tile-number">{{ e.com_medicacao }}</strong>
+    </li>
+  </ul>
+</section>
+<section class="stat-section" aria-labelledby="stat-profile-title">
+  <div class="stat-section-heading">
+    <div><span class="eyebrow">PERFIL</span><h2 id="stat-profile-title">Perfil dos acolhidos</h2></div>
+    <p class="muted">Faixas etárias e características cadastradas.</p>
+  </div>
+  <div class="stat-grid">
+    {% include 'acolhidos/partials/_grafico_barras.html' with id='idade' titulo='Faixa etária' icone='cake2' linhas=e.faixas_etarias %}
+    {% include 'acolhidos/partials/_grafico_barras.html' with id='sexo' titulo='Sexo' icone='gender-ambiguous' linhas=e.sexo %}
+    {% include 'acolhidos/partials/_grafico_barras.html' with id='naturalidade' titulo='Naturalidade' icone='geo-alt' linhas=e.naturalidades %}
+    {% include 'acolhidos/partials/_grafico_barras.html' with id='sangue' titulo='Tipo sanguíneo' icone='droplet' linhas=e.tipos_sanguineos %}
+  </div>
+</section>
+<section class="stat-section" aria-labelledby="stat-journey-title">
+  <div class="stat-section-heading">
+    <div><span class="eyebrow">ACOMPANHAMENTO</span><h2 id="stat-journey-title">Tempo e cuidados</h2></div>
+    <p class="muted">Entradas, permanência e informações de saúde.</p>
+  </div>
+  <div class="stat-grid">
+    {% include 'acolhidos/partials/_grafico_barras.html' with id='entrada' titulo='Ano de entrada' icone='calendar3' linhas=e.anos_entrada vazio='Nenhuma data de entrada registrada.' %}
+    {% include 'acolhidos/partials/_grafico_barras.html' with id='permanencia' titulo='Tempo de acolhimento' icone='hourglass-split' linhas=e.permanencia nota='O ECA prevê no máximo 18 meses de acolhimento, salvo decisão judicial.' %}
+    {% include 'acolhidos/partials/_grafico_barras.html' with id='alergias' titulo='Alergias' icone='exclamation-diamond' linhas=e.alergias vazio='Nenhuma alergia registrada.' %}
+    {% if situacao != 'ACOLHIDO' %}{% include 'acolhidos/partials/_grafico_barras.html' with id='destino' titulo='Destino após o desligamento' icone='signpost-split' linhas=e.destinos vazio='Nenhum desligamento com destino registrado.' %}{% endif %}
+  </div>
+</section>
+{% if e.sem_ficha %}<p class="list-footnote stat-footnote"><i class="bi bi-info-circle" aria-hidden="true"></i> {{ e.sem_ficha }} acolhido{{ e.sem_ficha|pluralize }} sem ficha de acolhimento fica{{ e.sem_ficha|pluralize:'m' }} fora de ano de entrada e tempo de acolhimento.</p>{% endif %}
+{% else %}
+<section class="surface stat-empty"><div class="empty-state"><i class="bi bi-bar-chart" aria-hidden="true"></i><h2>Nenhum acolhido nesta situação</h2><p>Escolha outra opção no filtro de situação.</p></div></section>
+{% endif %}
+{% endwith %}
+{% endblock %}

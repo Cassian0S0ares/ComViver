@@ -1,0 +1,17 @@
+{% autoescape off %}Olá{% if usuario.first_name %}, {{ usuario.first_name }}{% endif %}!
+
+Seu acesso ao ComViver já está disponível. Agradecemos por fazer parte da equipe e por ajudar no cuidado diário do Lar Padre José Gumercindo.
+
+Entre no sistema com os dados abaixo:
+Acesso: {{ login_url }}
+E-mail: {{ usuario.email }}
+Senha provisória: {{ senha_provisoria }}
+
+No primeiro acesso, o sistema pedirá que você troque essa senha por uma de sua escolha. Não compartilhe sua senha com outras pessoas.
+
+Se tiver dificuldade para entrar, procure a coordenação da instituição.
+
+Com carinho,
+Equipe do Lar Padre José Gumercindo
+ComViver
+{% endautoescape %}

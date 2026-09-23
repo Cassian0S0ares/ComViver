@@ -1,6 +1,8 @@
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Q, Sum
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -11,7 +13,7 @@ from accounts.models import Perfil
 from core.mixins import PerfilRequiredMixin
 from core.pdf import renderizar_pdf
 from core.views import BaseCreateView, BaseListView, BaseUpdateView
-from doacoes.forms import CampanhaForm, DoacaoForm, DoadorForm
+from doacoes.forms import CampanhaForm, DoacaoForm, DoadorForm, MetasItemFormSet
 from doacoes.models import Campanha, Doacao, Doador, TipoDoacao
 
 TODOS_OS_PERFIS = [Perfil.ADMIN, Perfil.TECNICO, Perfil.OPERACIONAL]
@@ -170,15 +172,18 @@ class CampanhaListView(BaseListView):
         return situacao if situacao in self.SITUACOES else "ativas"
 
     def get_queryset(self):
-        qs = super().get_queryset().annotate(
+        qs = super().get_queryset().prefetch_related("metas_itens").annotate(
             registros_itens=Count(
                 "doacoes",
                 filter=Q(
                     doacoes__deleted_at__isnull=True,
-                    doacoes__tipo__in=[tipo for tipo, _ in TipoDoacao.choices if tipo != TipoDoacao.DINHEIRO],
+                    doacoes__tipo__in=[
+                        tipo for tipo, _ in TipoDoacao.choices if tipo != TipoDoacao.DINHEIRO
+                    ],
                 ),
             )
         )
+        qs = qs.order_by("-data_inicio", "-pk")
         situacao = self._situacao()
         if situacao == "ativas":
             return qs.ativas()
@@ -221,7 +226,38 @@ class CampanhaDetailView(PerfilRequiredMixin, DetailView):
         return contexto
 
 
-class CampanhaCreateView(BaseCreateView):
+class MetasCampanhaMixin:
+    def get_metas_formset(self):
+        return MetasItemFormSet(
+            data=self.request.POST if self.request.method == "POST" else None,
+            instance=self.object or Campanha(),
+            prefix="metas",
+        )
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        contexto["metas_formset"] = getattr(self, "metas_formset", None) or self.get_metas_formset()
+        return contexto
+
+    def form_valid(self, form):
+        self.metas_formset = self.get_metas_formset()
+        if not self.metas_formset.is_valid():
+            return self.form_invalid(form)
+        with transaction.atomic():
+            if not form.instance.pk:
+                form.instance.criado_por = self.request.user
+            self.object = form.save()
+            self.metas_formset.instance = self.object
+            metas = self.metas_formset.save(commit=False)
+            for removida in self.metas_formset.deleted_objects:
+                removida.delete()
+            for meta in metas:
+                meta.save()
+            self.metas_formset.save_m2m()
+        messages.success(self.request, self.mensagem_sucesso)
+        return HttpResponseRedirect(self.get_success_url())
+
+class CampanhaCreateView(MetasCampanhaMixin, BaseCreateView):
     model = Campanha
     form_class = CampanhaForm
     template_name = "doacoes/campanha_form.html"
@@ -230,7 +266,7 @@ class CampanhaCreateView(BaseCreateView):
     perfis_permitidos = [Perfil.ADMIN]
 
 
-class CampanhaUpdateView(BaseUpdateView):
+class CampanhaUpdateView(MetasCampanhaMixin, BaseUpdateView):
     model = Campanha
     form_class = CampanhaForm
     template_name = "doacoes/campanha_form.html"

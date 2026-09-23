@@ -1,1 +1,74 @@
-{% extends 'base.html' %}{% block titulo %}{% if object %}Editar campanha{% else %}Nova campanha{% endif %}{% endblock %}{% block cabecalho %}<a href="{% url 'doacoes:campanha_lista' %}">Campanhas</a> <span>/</span> Cadastro{% endblock %}{% block conteudo %}<a class="back-link" href="{% url 'doacoes:campanha_lista' %}">← Voltar para campanhas</a><div class="page-heading"><div><h1>{% if object %}Editar campanha{% else %}Uma causa em comum.{% endif %}</h1><p class="muted">Defina o propósito, o período e a meta de arrecadação.</p></div></div><div class="form-layout"><section class="surface form-surface"><h2>Dados da campanha</h2><p class="muted small">Os campos com * são obrigatórios.</p><form method="post" novalidate data-submit data-dirty>{% csrf_token %}<div class="field-grid">{% include 'components/fields.html' %}</div><div class="form-actions"><button class="button button-primary" type="submit">Salvar campanha</button><a class="button button-secondary" href="{% url 'doacoes:campanha_lista' %}">Cancelar</a></div></form>{% if object and not object.encerrada_em %}<hr><h2>Encerrar campanha</h2><p class="muted">Encerra a campanha imediatamente, antes da data prevista. Essa a??o n?o pode ser desfeita.</p><form method="post" action="{% url 'doacoes:campanha_encerrar' object.pk %}">{% csrf_token %}<button class="button button-secondary" type="submit">Encerrar campanha agora</button></form>{% elif object %}<hr><p class="muted">Campanha encerrada em {{ object.encerrada_em|date:'d/m/Y H:i' }}.</p>{% endif %}</section><aside class="form-aside"><span class="state-icon"><i class="bi bi-flag" aria-hidden="true"></i></span><h2>Um objetivo compartilhado.</h2><p>A meta em reais considera apenas doações em dinheiro vinculadas à campanha.</p><p>Para encerrar uma campanha, informe o término. Ela permanece ativa até o final dessa data.</p></aside></div>{% endblock %}
+{% extends 'base.html' %}
+{% load static %}
+{% block titulo %}{% if object %}Editar campanha{% else %}Nova campanha{% endif %}{% endblock %}
+{% block cabecalho %}<a href="{% url 'doacoes:campanha_lista' %}">Campanhas</a> <span>/</span> Cadastro{% endblock %}
+{% block conteudo %}
+<a class="back-link" href="{% url 'doacoes:campanha_lista' %}">← Voltar para campanhas</a>
+<div class="page-heading">
+  <div>
+    <h1>{% if object %}Editar campanha{% else %}Uma causa em comum.{% endif %}</h1>
+    <p class="muted">Defina o propósito, o período e as metas de arrecadação.</p>
+  </div>
+</div>
+<div class="form-layout">
+  <section class="surface form-surface">
+    <h2>Dados da campanha</h2>
+    <p class="muted small">Os campos com * são obrigatórios. Você pode definir uma ou mais metas.</p>
+    <form method="post" novalidate data-submit data-dirty data-campaign-goals>
+      {% csrf_token %}
+      <div class="field-grid">{% include 'components/fields.html' with meta_valor_em_metas=True %}</div>
+      <section class="campaign-goals" aria-labelledby="campaign-goals-title">
+        <h3 id="campaign-goals-title">Metas da campanha</h3>
+        <p class="muted small">Combine uma meta em reais com metas de itens. Para os itens, escolha o tipo, a quantidade e a unidade.</p>
+        {{ metas_formset.management_form }}
+        {% if metas_formset.non_form_errors %}<div class="notice notice-danger" role="alert" tabindex="-1" data-form-error>{{ metas_formset.non_form_errors }}</div>{% endif %}
+        <div class="campaign-goal-list" data-meta-list>
+          <div class="campaign-goal-row campaign-goal-money" data-meta-row data-money-goal>
+            <h4>Dinheiro</h4>
+            <div class="field">
+              <label for="{{ form.meta_valor.id_for_label }}">Valor em reais</label>
+              {{ form.meta_valor }}
+              {% if form.meta_valor.help_text %}<div class="field-help" id="{{ form.meta_valor.id_for_label }}_helptext">{{ form.meta_valor.help_text }}</div>{% endif %}
+              {% if form.meta_valor.errors %}<div class="field-error" id="{{ form.meta_valor.id_for_label }}_error">{{ form.meta_valor.errors }}</div>{% endif %}
+            </div>
+            <button class="button button-secondary button-small" type="button" disabled data-enhancement data-remove-meta hidden>Remover meta</button>
+          </div>
+          {% for meta_form in metas_formset %}
+            {% include 'doacoes/partials/_meta_item_form.html' %}
+          {% endfor %}
+        </div>
+        <template data-meta-template>{% include 'doacoes/partials/_meta_item_form.html' with meta_form=metas_formset.empty_form %}</template>
+        <div class="campaign-goal-actions">
+          <button class="button button-secondary" type="button" disabled data-enhancement data-add-meta>Adicionar meta de item</button>
+          <button class="button button-secondary" type="button" disabled data-enhancement data-add-money hidden>Adicionar meta em reais</button>
+        </div>
+        <noscript><p class="field-help">Para incluir mais de duas metas de itens, ative o JavaScript.</p></noscript>
+      </section>
+      <div class="form-actions">
+        <button class="button button-primary" type="submit">Salvar campanha</button>
+        <a class="button button-secondary" href="{% url 'doacoes:campanha_lista' %}">Cancelar</a>
+      </div>
+    </form>
+    {% if object and not object.encerrada_em %}
+      <hr>
+      <h2>Encerrar campanha</h2>
+      <p class="muted">Encerra a campanha imediatamente, antes da data prevista. Essa ação não pode ser desfeita.</p>
+      <form method="post" action="{% url 'doacoes:campanha_encerrar' object.pk %}" novalidate>
+        {% csrf_token %}
+        <button class="button button-secondary" type="submit">Encerrar campanha agora</button>
+      </form>
+    {% elif object %}
+      <hr><p class="muted">Campanha encerrada em {{ object.encerrada_em|date:'d/m/Y H:i' }}.</p>
+    {% endif %}
+  </section>
+  <aside class="form-aside">
+    <span class="state-icon"><i class="bi bi-flag" aria-hidden="true"></i></span>
+    <h2>Um objetivo compartilhado.</h2>
+    <p>Você pode combinar uma meta em reais com várias metas de itens.</p>
+    <p>O progresso de cada meta considera apenas as doações vinculadas à campanha.</p>
+    <p>Para encerrar uma campanha, informe o término. Ela permanece ativa até o final dessa data.</p>
+  </aside>
+</div>
+<script src="{% static 'js/unidades_doacao.js' %}" defer></script>
+<script src="{% static 'js/campanha_metas.js' %}" defer></script>
+{% endblock %}

@@ -17,7 +17,7 @@ DADOS_IDENTIFICACAO = {
     "identificacao-nome_social": "",
     "identificacao-nascimento": "2015-03-10",
     "identificacao-sexo": "F",
-    "identificacao-naturalidade": "Itajubá",
+    "identificacao-naturalidade": "Cruzeiro",
     "identificacao-cpf": "",
     "identificacao-rg": "",
     "identificacao-certidao_nascimento": "",
@@ -40,7 +40,7 @@ DADOS_SAUDE = {
     "saude-condicoes": "",
     "saude-plano_saude": "",
     "saude-escola": "E.E. Dom Pedro",
-    "saude-serie": "4º ano",
+    "saude-serie": "4º ano do Ensino Fundamental",
     "saude-turno": "MANHA",
 }
 

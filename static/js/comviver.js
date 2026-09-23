@@ -233,3 +233,79 @@ window.addEventListener('pageshow', () => {
 document.querySelectorAll('button[data-enhancement]').forEach(button => {
   button.disabled = false;
 });
+// Lista de itens (ex.: alergias): digita um, aperta Adicionar ou Enter. O
+// textarea continua no formulario, oculto, com um item por linha; sem
+// JavaScript a pessoa escreve direto nele.
+document.querySelectorAll('textarea[data-itens]').forEach(textarea => {
+  const nome = textarea.dataset.itens;
+  const itens = textarea.value.split('\n').map(item => item.trim()).filter(Boolean);
+
+  const caixa = document.createElement('div');
+  caixa.className = 'lista-itens';
+  const linha = document.createElement('div');
+  linha.className = 'lista-itens-entrada';
+  const entrada = document.createElement('input');
+  entrada.type = 'text';
+  entrada.className = 'form-control';
+  entrada.id = textarea.id;
+  entrada.placeholder = `Digite uma ${nome}`;
+  entrada.maxLength = 100;
+  ['aria-invalid', 'aria-describedby'].forEach(attr => {
+    if (textarea.hasAttribute(attr)) entrada.setAttribute(attr, textarea.getAttribute(attr));
+  });
+  textarea.id = `${textarea.id}_valores`;
+  const adicionar = document.createElement('button');
+  adicionar.type = 'button';
+  adicionar.className = 'button button-secondary';
+  adicionar.innerHTML = '<i class="bi bi-plus-lg" aria-hidden="true"></i> Adicionar';
+  const lista = document.createElement('ul');
+  lista.className = 'lista-itens-valores';
+  lista.setAttribute('aria-live', 'polite');
+  linha.append(entrada, adicionar);
+  caixa.append(linha, lista);
+  textarea.hidden = true;
+  textarea.after(caixa);
+
+  const sincronizar = () => {
+    textarea.value = itens.join('\n');
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  const desenhar = () => {
+    lista.replaceChildren(...itens.map((item, indice) => {
+      const li = document.createElement('li');
+      const texto = document.createElement('span');
+      texto.textContent = item;
+      const remover = document.createElement('button');
+      remover.type = 'button';
+      remover.className = 'icon-button';
+      remover.setAttribute('aria-label', `Remover ${item}`);
+      remover.innerHTML = '<i class="bi bi-x-lg" aria-hidden="true"></i>';
+      remover.addEventListener('click', () => {
+        itens.splice(indice, 1);
+        sincronizar(); desenhar(); entrada.focus();
+      });
+      li.append(texto, remover);
+      return li;
+    }));
+  };
+  const incluir = () => {
+    const item = entrada.value.replace(/\s+/g, ' ').trim();
+    if (!item) { entrada.focus(); return; }
+    if (!itens.some(atual => atual.toLowerCase() === item.toLowerCase())) {
+      itens.push(item);
+      sincronizar(); desenhar();
+    }
+    entrada.value = '';
+    entrada.focus();
+  };
+
+  adicionar.addEventListener('click', incluir);
+  // Enter adiciona o item em vez de enviar o formulario.
+  entrada.addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); incluir(); }
+  });
+  // O texto digitado e nao adicionado nao deve disparar o aviso de alteracoes.
+  entrada.addEventListener('input', event => event.stopPropagation());
+  textarea.form?.addEventListener('submit', () => { if (entrada.value.trim()) incluir(); });
+  desenhar();
+});

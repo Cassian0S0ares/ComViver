@@ -68,6 +68,23 @@ class TestDinheiroSemQuantidade:
         assert resposta.status_code == 200
         assert "Informe o valor da doação em dinheiro" in resposta.content.decode()
 
+    def test_trocar_dinheiro_por_item_descarta_valor_enviado(self, client, usuario_operacional):
+        doacao = DoacaoFactory()
+        client.force_login(usuario_operacional)
+        resposta = client.post(
+            reverse("doacoes:editar", args=[doacao.pk]),
+            _dados(
+                tipo=TipoDoacao.ALIMENTO,
+                descricao="Arroz",
+                quantidade="1",
+                unidade="unidades",
+                valor="500,00",
+            ),
+        )
+        assert resposta.status_code == 302
+        doacao.refresh_from_db()
+        assert doacao.tipo == TipoDoacao.ALIMENTO
+        assert doacao.valor is None
 
 class TestCamposEscondidos:
     def test_formulario_marca_os_campos_de_especie(self, client, usuario_operacional):

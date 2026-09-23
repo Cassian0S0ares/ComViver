@@ -1,9 +1,10 @@
 {% if form.non_field_errors %}<div class="notice notice-danger" role="alert" tabindex="-1" data-form-error>{{ form.non_field_errors }}</div>{% endif %}
 {% for field in form %}
+  {% if field.name != 'meta_valor' or not meta_valor_em_metas %}
   {% if field.name == "foto" %}
   <div class="field field-photo {% if field.field.widget.input_type == 'checkbox' %}field-checkbox{% endif %}">
     <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required" aria-hidden="true"> *</span>{% endif %}</label>
-    <div class="field-photo-wrap">
+    <div class="field-photo-wrap{% if object and object.foto %} has-preview{% endif %}">
       {% if object and object.foto %}
       <div class="field-photo-preview">
         <img src="{% url 'media_protegida' object.foto.name %}" alt="Foto atual de {{ object.nome_exibicao }}" loading="lazy">
@@ -24,5 +25,6 @@
     <div class="field-help" id="{{ field.id_for_label }}_helptext">{{ field.help_text|safe }}</div>
     {% if field.errors %}<div class="field-error" id="{{ field.id_for_label }}_error">{{ field.errors }}</div>{% endif %}
   </div>
+  {% endif %}
   {% endif %}
 {% endfor %}

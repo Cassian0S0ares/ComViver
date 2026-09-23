@@ -82,6 +82,7 @@ const donationForm = document.querySelector('[data-doacao-form]');
 if (donationForm) {
   const type = document.getElementById('id_tipo');
   const amount = document.getElementById('id_valor');
+  const amountField = donationForm.querySelector('[data-campo="valor"]');
   const description = document.getElementById('id_descricao');
   // Quantidade e unidade so fazem sentido para doacao em especie.
   const especie = ['quantidade', 'unidade']
@@ -89,16 +90,23 @@ if (donationForm) {
     .filter(Boolean);
   const update = () => {
     const money = type.value === 'DINHEIRO';
+    const item = Boolean(type.value) && !money;
     especie.forEach(campo => {
       campo.hidden = money;
       campo.querySelectorAll('input, select').forEach(entrada => {
         entrada.disabled = money;
+        entrada.required = item;
         if (money) entrada.value = '';
       });
+      campo.querySelector('label').textContent = `${campo.dataset.campo === 'quantidade' ? 'Quantidade' : 'Unidade'}${item ? ' *' : ''}`;
+
     });
+    amountField.hidden = !money;
+    amount.disabled = !money;
+    if (!money) amount.value = '';
     amount.required = money;
     description.required = Boolean(type.value) && !money;
-    amount.closest('.field').querySelector('label').textContent = `Valor em reais${money ? ' *' : ' (opcional)'}`;
+    amountField.querySelector('label').textContent = 'Valor em reais *';
     description.closest('.field').querySelector('label').textContent = `Descrição${type.value && !money ? ' *' : ''}`;
   };
   type.addEventListener('change', update); update();

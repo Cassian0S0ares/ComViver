@@ -1,3 +1,5 @@
+from smtplib import SMTPException
+
 from django.contrib import messages
 from django.contrib.auth.views import (
     LoginView,
@@ -9,12 +11,14 @@ from django.contrib.auth.views import (
     PasswordResetView,
 )
 from django.core.cache import cache
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.views.generic import CreateView, ListView, UpdateView
 
+from accounts.emails import enviar_boas_vindas
 from accounts.forms import (
     EsqueciSenhaForm,
     LoginForm,
@@ -41,6 +45,7 @@ class EsqueciSenhaView(PasswordResetView):
     template_name = "accounts/esqueci_senha.html"
     form_class = EsqueciSenhaForm
     email_template_name = "accounts/email/redefinir_senha.txt"
+    html_email_template_name = "accounts/email/redefinir_senha.html"
     subject_template_name = "accounts/email/redefinir_senha_assunto.txt"
     success_url = reverse_lazy("accounts:esqueci_senha_enviado")
 
@@ -137,11 +142,26 @@ class UsuarioCreateView(PerfilRequiredMixin, UsuarioFormViewMixin, CreateView):
     perfis_permitidos = [Perfil.ADMIN]
 
     def form_valid(self, form):
-        resposta = super().form_valid(form)
+        senha_provisoria = form.cleaned_data["password1"]
+        login_url = self.request.build_absolute_uri(reverse("accounts:login"))
+        try:
+            with transaction.atomic():
+                resposta = super().form_valid(form)
+                enviar_boas_vindas(self.object, senha_provisoria, login_url)
+        except (OSError, SMTPException):
+            # O rollback desfaz o registro, mas a instância ainda guarda o PK em memória.
+            self.object = None
+            form.instance.pk = None
+            form.instance._state.adding = True
+            form.add_error(
+                None,
+                "Não foi possível enviar o e-mail de acesso. Confira a configuração de envio e tente novamente.",
+            )
+            return self.form_invalid(form)
         messages.success(
             self.request,
             f"Usuário {self.object.get_full_name()} criado. "
-            "Informe a senha provisória; ele deverá trocá-la no primeiro acesso.",
+            "O e-mail com o acesso e a senha provisória foi enviado.",
         )
         return resposta
 

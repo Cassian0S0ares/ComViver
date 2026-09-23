@@ -49,8 +49,8 @@ def _serie(idade: int) -> str | None:
     if idade < 6:
         return None  # educacao infantil, sem escola registrada na demonstracao
     if idade <= 14:
-        return f"{idade - 5}º ano"
-    return f"{min(idade - 14, 3)}ª série do ensino médio"
+        return f"{idade - 5}º ano do Ensino Fundamental"
+    return f"{min(idade - 14, 3)}º ano do Ensino Médio"
 
 
 class Command(BaseCommand):

@@ -1,0 +1,20 @@
+<section class="surface stat-card" aria-labelledby="stat-{{ id }}">
+  <div class="stat-card-heading">
+    <span class="stat-card-icon"><i class="bi bi-{{ icone }}" aria-hidden="true"></i></span>
+    <h3 id="stat-{{ id }}">{{ titulo }}</h3>
+  </div>
+  {% if linhas %}
+  <ul class="stat-list" aria-label="{{ titulo }}: quantidade e porcentagem de acolhidos">
+    {% for linha in linhas %}
+    <li class="stat-list-item">
+      <div class="stat-list-labels">
+        <span class="stat-list-label">{{ linha.rotulo }}</span>
+        <span class="stat-list-value">{{ linha.quantidade }} <small>({{ linha.porcentagem }}%)</small></span>
+      </div>
+      <span class="stat-bar-track" aria-hidden="true"><span class="stat-bar" style="width: {{ linha.largura }}%"></span></span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="muted stat-card-empty">{{ vazio|default:'Nenhum dado registrado.' }}</p>{% endif %}
+  {% if nota %}<p class="muted small stat-note">{{ nota }}</p>{% endif %}
+</section>

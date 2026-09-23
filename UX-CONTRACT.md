@@ -111,3 +111,18 @@ perder a ação escolhida. Alterações de doação registram autor no históric
 recebeu originalmente é preservado. Campanhas ficam ativas até o fim da data final.
 Consultar/baixar recibo não altera estado. Marcar entregue exige POST com CSRF e é
 idempotente. O renderizador PDF aceita somente CSS/fontes locais autorizados.
+
+## Metas de campanhas
+
+Uma campanha pode ter uma meta em reais e várias metas de itens. Cada meta de item
+combina tipo de doação, quantidade inteira positiva e unidade compatível com o tipo; tipo e unidade não
+podem se repetir na mesma campanha. O progresso financeiro soma apenas doações em
+dinheiro. O progresso de item soma apenas quantidades de doações vinculadas à mesma
+campanha com o mesmo tipo e unidade. Doações sem quantidade não aumentam a meta.
+A tela mostra cada progresso separadamente e aceita metas de itens sem meta em reais.
+A criação e a edição salvam campanha e metas na mesma transação. Metas financeiras
+anteriores continuam no campo `meta_valor`.
+No formulário, a meta em dinheiro fica na seção Metas e mostra apenas o valor em
+reais. Metas de itens mostram tipo, quantidade e unidade. O botão Remover meta
+aparece apenas quando há mais de uma meta visível; ao remover uma meta existente,
+o formulário marca sua exclusão para o salvamento.

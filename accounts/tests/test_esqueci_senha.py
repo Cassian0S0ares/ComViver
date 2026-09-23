@@ -97,3 +97,18 @@ class TestRedefinirSenha:
         )
         segunda = client.get(link, follow=True)
         assert "Este link não é mais válido" in segunda.content.decode()
+
+
+class TestEmailBonito:
+    def test_email_tem_versao_html_com_link_e_logo(self, client):
+        UsuarioFactory(email="maria@exemplo.org", first_name="Maria")
+        pedir_link(client, "maria@exemplo.org")
+        mensagem = mail.outbox[0]
+        html, tipo = mensagem.alternatives[0]
+        assert tipo == "text/html"
+        assert link_do_email() in html
+        assert "Maria" in html
+        assert 'src="cid:logo-comviver"' in html
+        logo = mensagem.attachments[0]
+        assert logo["Content-ID"] == "<logo-comviver>"
+        assert logo.get_content_type() == "image/png"

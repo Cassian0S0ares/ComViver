@@ -7,7 +7,10 @@ from django.contrib.auth.forms import (
     UserCreationForm,
 )
 from django.core.exceptions import PermissionDenied
+from django.core.mail import EmailMultiAlternatives
+from django.template import loader
 
+from accounts.emails import LOGO_CID, anexar_logo
 from accounts.models import Usuario
 
 
@@ -108,6 +111,35 @@ class EsqueciSenhaForm(FormularioAcessivelMixin, PasswordResetForm):
 
     def clean_email(self):
         return self.cleaned_data["email"].strip().lower()
+
+    def send_mail(
+        self,
+        subject_template_name,
+        email_template_name,
+        context,
+        from_email,
+        to_email,
+        html_email_template_name=None,
+    ):
+        """Envia texto e HTML, com a logo anexada dentro da mensagem.
+
+        A logo vai como anexo inline (cid:) e nao como link: o servidor pode
+        nao ser acessivel de fora, e muitos clientes bloqueiam imagem remota.
+        """
+        context = {**context, "logo_cid": LOGO_CID}
+        assunto = "".join(loader.render_to_string(subject_template_name, context).splitlines())
+        mensagem = EmailMultiAlternatives(
+            assunto,
+            loader.render_to_string(email_template_name, context),
+            from_email,
+            [to_email],
+        )
+        if html_email_template_name:
+            mensagem.attach_alternative(
+                loader.render_to_string(html_email_template_name, context), "text/html"
+            )
+            anexar_logo(mensagem)
+        mensagem.send()
 
 
 class NovaSenhaForm(FormularioAcessivelMixin, SetPasswordForm):

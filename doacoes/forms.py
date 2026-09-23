@@ -1,10 +1,19 @@
 from django import forms
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import models
+from django.forms import BaseInlineFormSet, inlineformset_factory
 
 from accounts.forms import FormularioAcessivelMixin
 from accounts.models import Perfil
-from doacoes.models import Campanha, Doacao, Doador, TipoDoacao
+from doacoes.models import (
+    UNIDADES_DOACAO,
+    UNIDADES_POR_TIPO,
+    Campanha,
+    Doacao,
+    Doador,
+    MetaItemCampanha,
+    TipoDoacao,
+)
 
 
 def _aplicar_classes(campos):
@@ -15,6 +24,16 @@ def _aplicar_classes(campos):
             campo.widget.attrs.update({"class": "form-select"})
         else:
             campo.widget.attrs.update({"class": "form-control"})
+
+
+class UnidadePorTipoSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        opcao = super().create_option(name, value, label, selected, index, subindex, attrs)
+        if value:
+            opcao["attrs"]["data-tipos"] = " ".join(
+                tipo for tipo, unidades in UNIDADES_POR_TIPO.items() if str(value) in unidades
+            )
+        return opcao
 
 
 class FormularioDoacoesMixin(FormularioAcessivelMixin):
@@ -28,6 +47,20 @@ class FormularioDoacoesMixin(FormularioAcessivelMixin):
 
 
 class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
+    quantidade = forms.IntegerField(
+        label="Quantidade",
+        min_value=1,
+        max_value=99_999_999,
+        required=False,
+        widget=forms.NumberInput(attrs={"min": 1, "step": 1, "inputmode": "numeric"}),
+    )
+    unidade = forms.ChoiceField(
+        label="Unidade",
+        choices=[("", "Selecione a unidade"), *UNIDADES_DOACAO],
+        widget=UnidadePorTipoSelect,
+        required=False,
+    )
+
     class Meta:
         model = Doacao
         fields = [
@@ -62,6 +95,12 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
             )
         self.fields["campanha"].queryset = campanhas
         self.fields["campanha"].empty_label = "Nenhuma"
+        unidade_atual = self.instance.unidade if self.instance.pk else ""
+        if unidade_atual and unidade_atual not in dict(UNIDADES_DOACAO):
+            self.fields["unidade"].choices = [
+                *self.fields["unidade"].choices,
+                (unidade_atual, unidade_atual),
+            ]
         _aplicar_classes(self.fields)
         self.fields["quantidade"].required = False
         self.fields["unidade"].required = False
@@ -80,6 +119,9 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
             dados["unidade"] = ""
             self.instance.quantidade = None
             self.instance.unidade = ""
+        else:
+            dados["valor"] = None
+            self.instance.valor = None
         return dados
 
 
@@ -110,7 +152,9 @@ class DoadorForm(FormularioDoacoesMixin, forms.ModelForm):
         super().__init__(*args, usuario=usuario, **kwargs)
         self.usuario = usuario
         _aplicar_classes(self.fields)
-        self.fields["cep"].widget.attrs.update({"inputmode": "numeric", "maxlength": 9, "autocomplete": "postal-code"})
+        self.fields["cep"].widget.attrs.update(
+            {"inputmode": "numeric", "maxlength": 9, "autocomplete": "postal-code"}
+        )
 
     def clean_cpf_cnpj(self):
         numero = "".join(filter(str.isdigit, self.cleaned_data.get("cpf_cnpj", "")))
@@ -145,3 +189,46 @@ class CampanhaForm(FormularioDoacoesMixin, forms.ModelForm):
         if inicio and fim and fim < inicio:
             self.add_error("data_fim", "O término não pode ser anterior ao início.")
         return dados
+
+
+class MetaItemCampanhaForm(forms.ModelForm):
+    quantidade = forms.IntegerField(
+        label="Quantidade",
+        min_value=1,
+        widget=forms.NumberInput(attrs={"min": 1, "step": 1, "inputmode": "numeric"}),
+    )
+
+    class Meta:
+        model = MetaItemCampanha
+        fields = ["tipo", "quantidade", "unidade"]
+        widgets = {"unidade": UnidadePorTipoSelect}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _aplicar_classes(self.fields)
+
+
+class BaseMetasItemFormSet(BaseInlineFormSet):
+    def clean(self):
+        if any(self.errors):
+            return
+        combinacoes = set()
+        for form in self.forms:
+            dados = form.cleaned_data
+            if not dados or dados.get("DELETE"):
+                continue
+            chave = (dados["tipo"], dados["unidade"])
+            if chave in combinacoes:
+                raise ValidationError("Cada tipo e unidade pode ter apenas uma meta na campanha.")
+            combinacoes.add(chave)
+        super().clean()
+
+
+MetasItemFormSet = inlineformset_factory(
+    Campanha,
+    MetaItemCampanha,
+    form=MetaItemCampanhaForm,
+    formset=BaseMetasItemFormSet,
+    extra=2,
+    can_delete=True,
+)

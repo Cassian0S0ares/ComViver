@@ -8,12 +8,14 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
-from django.views.generic import DetailView, FormView, UpdateView
+from django.views.generic import DetailView, FormView, TemplateView, UpdateView
 from formtools.wizard.views import SessionWizardView
 
 from accounts.models import AcaoFicha, LogAcessoFicha, Perfil
+from acolhidos import estatisticas
 from acolhidos.forms import (
     DesligamentoForm,
+    EtapaAcolhimentoCadastroForm,
     EtapaAcolhimentoForm,
     EtapaIdentificacaoForm,
     EtapaResponsavelForm,
@@ -73,6 +75,31 @@ class AcolhidoListView(BaseListView):
         return contexto
 
 
+class EstatisticasView(PerfilRequiredMixin, TemplateView):
+    """Visao geral dos acolhidos: so contagens, nenhum nome.
+
+    Agrega saude e tempo de acolhimento, por isso fica com a equipe tecnica.
+    """
+
+    template_name = "acolhidos/estatisticas.html"
+    perfis_permitidos = EQUIPE_TECNICA
+
+    def _situacao(self) -> str:
+        situacao = self.request.GET.get("situacao", StatusAcolhido.ACOLHIDO)
+        return situacao if situacao in dict(SITUACOES) else StatusAcolhido.ACOLHIDO
+
+    def get_context_data(self, **kwargs):
+        contexto = super().get_context_data(**kwargs)
+        situacao = self._situacao()
+        acolhidos = Acolhido.objects.select_related("ficha", "saude")
+        if situacao != "TODOS":
+            acolhidos = acolhidos.filter(status=situacao)
+        contexto["situacao"] = situacao
+        contexto["situacoes"] = SITUACOES
+        contexto["estatisticas"] = estatisticas.calcular(acolhidos)
+        return contexto
+
+
 class AcolhidoDetailView(PerfilRequiredMixin, RegistraAcessoFichaMixin, DetailView):
     """Ficha do acolhido, recortada pelo perfil.
 
@@ -115,7 +142,7 @@ class AcolhidoDetailView(PerfilRequiredMixin, RegistraAcessoFichaMixin, DetailVi
 
 ETAPAS = [
     ("identificacao", EtapaIdentificacaoForm),
-    ("acolhimento", EtapaAcolhimentoForm),
+    ("acolhimento", EtapaAcolhimentoCadastroForm),
     ("saude", EtapaSaudeEscolaForm),
     ("responsavel", EtapaResponsavelForm),
 ]
