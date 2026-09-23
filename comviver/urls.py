@@ -12,6 +12,7 @@ urlpatterns = [
     path("", include("accounts.urls")),
     path("", include("acolhidos.urls")),
     path("", include("doacoes.urls")),
+    path("", include("voluntarios.urls")),
     path("", include("core.urls")),
 ]
 

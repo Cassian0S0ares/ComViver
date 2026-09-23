@@ -29,6 +29,10 @@ def menu(request):
         ]
     )
 
+    itens.append(
+        {"rotulo": "Voluntários", "url": reverse("voluntarios:lista"), "icone": "person-badge"}
+    )
+
     if request.user.pode_gerenciar_usuarios():
         itens.append(
             {"rotulo": "Usuários", "url": reverse("accounts:usuario_list"), "icone": "people"}

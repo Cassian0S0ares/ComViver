@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     "accounts",
     "acolhidos",
     "doacoes",
+    "voluntarios",
 ]
 
 MIDDLEWARE = [
