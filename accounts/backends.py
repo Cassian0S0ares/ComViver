@@ -5,8 +5,8 @@ from django.contrib.auth.backends import ModelBackend
 class EmailBackend(ModelBackend):
     """Autentica pelo e-mail, sem diferenciar maiusculas.
 
-    O formulario de login continua enviando o campo como `username` para que o
-    django-axes aplique o bloqueio por tentativas sobre o e-mail digitado.
+    O formulario de login continua enviando o campo como `username`, que e o
+    nome esperado pelo django-axes ao registrar as tentativas.
     """
 
     def authenticate(self, request, username=None, password=None, **kwargs):

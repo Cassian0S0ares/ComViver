@@ -1,3 +1,6 @@
+import re
+from datetime import date
+
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db import transaction
@@ -20,6 +23,12 @@ TODOS_OS_PERFIS = [Perfil.ADMIN, Perfil.TECNICO, Perfil.OPERACIONAL]
 QUEM_REGISTRA = [Perfil.ADMIN, Perfil.OPERACIONAL]
 
 
+NOMES_MESES = (
+    "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+    "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+)
+
+
 class DoacaoListView(BaseListView):
     model = Doacao
     template_name = "doacoes/doacao_list.html"
@@ -27,11 +36,49 @@ class DoacaoListView(BaseListView):
     campos_busca = ["descricao", "doador__nome"]
     perfis_permitidos = TODOS_OS_PERFIS
 
+    def _mes_filtrado(self):
+        mes = self.request.GET.get("mes", "")
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", mes):
+            return ""
+        try:
+            date.fromisoformat(f"{mes}-01")
+        except ValueError:
+            return ""
+        return mes
+
+    def _meses_disponiveis(self, mes_filtrado):
+        """Meses com doacoes, do mais recente ao mais antigo, com rotulo legivel."""
+        valores = [
+            dia.strftime("%Y-%m")
+            for dia in self.model._default_manager.dates("data_recebimento", "month", order="DESC")
+        ]
+        if mes_filtrado and mes_filtrado not in valores:
+            valores.append(mes_filtrado)
+            valores.sort(reverse=True)
+        opcoes = []
+        for valor in valores:
+            ano, numero_mes = valor.split("-")
+            opcoes.append((valor, f"{NOMES_MESES[int(numero_mes) - 1]} de {ano}"))
+        return opcoes
+
     def get_queryset(self):
         qs = super().get_queryset().select_related("doador", "campanha", "recebido_por")
         tipo = self.request.GET.get("tipo")
         if tipo:
             qs = qs.filter(tipo=tipo)
+        mes = self._mes_filtrado()
+        if mes:
+            ano, numero_mes = map(int, mes.split("-"))
+            inicio = date(ano, numero_mes, 1)
+            if ano == 9999 and numero_mes == 12:
+                qs = qs.filter(data_recebimento__gte=inicio)
+            else:
+                proximo_mes = (
+                    date(ano + 1, 1, 1)
+                    if numero_mes == 12
+                    else date(ano, numero_mes + 1, 1)
+                )
+                qs = qs.filter(data_recebimento__gte=inicio, data_recebimento__lt=proximo_mes)
         return qs
 
     def get_context_data(self, **kwargs):
@@ -39,6 +86,8 @@ class DoacaoListView(BaseListView):
 
         contexto = super().get_context_data(**kwargs)
         contexto["tipo_filtrado"] = self.request.GET.get("tipo", "")
+        contexto["mes_filtrado"] = self._mes_filtrado()
+        contexto["meses_disponiveis"] = self._meses_disponiveis(contexto["mes_filtrado"])
         contexto["totais"] = totais_por_tipo(self.get_queryset())
         contexto["form_tipos"] = TipoDoacao.choices
         return contexto

@@ -112,3 +112,36 @@ class TestBloqueioPorTentativas:
             {"username": "maria@exemplo.org", "password": "senha-de-teste-123"},
         )
         assert resposta.status_code in (403, 429)
+
+    def _errar_cinco_vezes(self, client, email, ip):
+        for _ in range(5):
+            client.post(
+                reverse("accounts:login"),
+                {"username": email, "password": "errada"},
+                REMOTE_ADDR=ip,
+            )
+
+    def test_mesma_conta_segue_acessivel_de_outro_ip(self, client, settings):
+        """Quem erra a senha de alguem nao pode travar o acesso do dono."""
+        settings.AXES_ENABLED = True
+        UsuarioFactory(email="maria@exemplo.org", password="senha-de-teste-123")
+        self._errar_cinco_vezes(client, "maria@exemplo.org", "10.0.0.1")
+
+        resposta = client.post(
+            reverse("accounts:login"),
+            {"username": "maria@exemplo.org", "password": "senha-de-teste-123"},
+            REMOTE_ADDR="10.0.0.2",
+        )
+        assert resposta.status_code == 302
+
+    def test_ip_bloqueado_nao_entra_nem_em_outra_conta(self, client, settings):
+        settings.AXES_ENABLED = True
+        UsuarioFactory(email="joao@exemplo.org", password="senha-de-teste-123")
+        self._errar_cinco_vezes(client, "maria@exemplo.org", "10.0.0.1")
+
+        resposta = client.post(
+            reverse("accounts:login"),
+            {"username": "joao@exemplo.org", "password": "senha-de-teste-123"},
+            REMOTE_ADDR="10.0.0.1",
+        )
+        assert resposta.status_code == 429

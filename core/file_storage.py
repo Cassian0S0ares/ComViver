@@ -1,3 +1,6 @@
+import uuid
+from pathlib import Path
+
 from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, Storage
@@ -43,3 +46,23 @@ class BancoDeDadosStorage(Storage):
 
     def url(self, name):
         return reverse("media_protegida", args=[name])
+
+
+class RascunhoAcolhimentoStorage(BancoDeDadosStorage):
+    """Rascunhos do assistente no banco, com nomes impossíveis de adivinhar."""
+
+    @property
+    def location(self):
+        """Pasta usada apenas por rascunhos iniciados antes desta mudança."""
+        return str(settings.ASSISTENTE_TEMP_DIR)
+
+    def _legado(self):
+        # Mantém rascunhos iniciados antes da troca do armazenamento.
+        return FileSystemStorage(location=settings.ASSISTENTE_TEMP_DIR)
+
+    def get_available_name(self, name, max_length=None):
+        extensao = Path(name).suffix.lower()
+        if extensao not in {".jpg", ".jpeg", ".png", ".webp"}:
+            extensao = ".bin"
+        nome_opaco = f"_rascunhos/acolhidos/{uuid.uuid4().hex}{extensao}"
+        return super().get_available_name(nome_opaco, max_length=max_length)

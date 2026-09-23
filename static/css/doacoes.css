@@ -29,3 +29,6 @@
 .campaign-progress-list progress{width:100%;height:10px;accent-color:var(--color-success)}
 .campaign-progress-list small{color:var(--color-muted)}
 .campaign-card .campaign-progress{padding:var(--space-md);margin:var(--space-md) 0 0;width:100%;background:var(--color-paper)}
+
+.donation-totals{padding-inline:var(--space-lg)}
+@media(max-width:700px){.donation-totals{padding-inline:var(--space-md)}}

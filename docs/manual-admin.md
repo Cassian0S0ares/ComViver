@@ -33,9 +33,12 @@ Para redefinir uma senha esquecida, use `python manage.py changepassword NOME`
 com settings do ambiente correto. Depois, marque **precisa trocar a senha** no
 cadastro de manutenção. Entregue a senha provisória de forma reservada.
 
-O django-axes registra tentativas. Após cinco erros, o par usuário/IP é bloqueado
-por 30 minutos. O superusuário pode revisar tentativas em `/admin/` e desbloquear
-uma conta pelo mecanismo do Axes. Sessões expiram após uma hora sem atividade e
+O django-axes registra tentativas. Após cinco erros, o IP de origem é bloqueado
+por 30 minutos; a conta continua acessível de outras conexões. Atrás de proxy
+HTTPS, defina `PROXY_COUNT` (número de proxies na frente da aplicação, em geral
+1) para o bloqueio usar o IP real do visitante. Sem isso, todos compartilham o
+IP do proxy e seriam bloqueados juntos. O superusuário pode revisar tentativas
+em `/admin/` e desbloquear um IP pelo mecanismo do Axes. Sessões expiram após uma hora sem atividade e
 ao fechar o navegador.
 
 ## Backup

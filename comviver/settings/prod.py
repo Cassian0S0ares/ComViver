@@ -12,6 +12,12 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Atras do proxy HTTPS, REMOTE_ADDR e o IP do proxy para todo mundo; o bloqueio
+# de login por IP travaria todos os usuarios juntos. Informe quantos proxies
+# ficam na frente da aplicacao para o axes ler o IP real em X-Forwarded-For.
+# Com 0, usa REMOTE_ADDR (acesso direto, sem proxy).
+PROXY_COUNT = env.int("PROXY_COUNT", default=0)  # noqa: F405
+
 # Origens autorizadas a enviar formulario. Sem isso, o Django recusa POST
 # vindo do proprio dominio quando ha proxy HTTPS na frente.
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])  # noqa: F405

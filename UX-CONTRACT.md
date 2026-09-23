@@ -20,6 +20,7 @@ Não há regras de cobrança ou pagamentos nesta fase.
 | Capability | Canonical owner | Source of truth | Allowed variants | Verification |
 |---|---|---|---|---|
 | Select/Listbox | Django Select / select HTML | DESIGN.md | native, popup do navegador | teste de teclado em navegador |
+| Date | input date e month nativos | este contrato | calendário e mês/ano do navegador | pytest + navegador |
 | Form | components/fields.html + FormularioAcessivelMixin | este contrato | criar, editar, senha, login | pytest + navegador |
 | Scrollbar | static/css/comviver.css | DESIGN.md | tabela com overflow próprio | computed style |
 | Toast | components/messages.html + Django messages | este contrato | sucesso, erro inline persistente | pytest + navegador |
@@ -100,6 +101,8 @@ Na busca auxiliar de doador, texto é transitório e não vai para a URL da pág
 selecionar uma sugestão atualiza o campo nativo. Falha de rede deixa a seleção
 nativa disponível. Limpar cancela a requisição e mantém o doador já selecionado.
 Nas listagens, Enter/Filtrar confirma a busca; limpar preserva os demais filtros.
+Na lista de doações, o filtro Mês usa ano e mês (`AAAA-MM`) da data de recebimento.
+Ele combina com busca e tipo, atualiza os totais e permanece na URL da paginação.
 
 Admin e Operacional cadastram doadores, registram/alteram doações e emitem recibos.
 Técnico consulta as listas e o histórico do doador. Campanhas só são alteradas por

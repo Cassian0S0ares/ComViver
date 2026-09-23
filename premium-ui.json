@@ -3,8 +3,8 @@
   "sourceRoots": ["templates", "static/css", "static/js"],
   "locale": "pt-BR",
   "canonicalMap": "UX-CONTRACT.md",
-  "requiredCapabilities": ["Select/Listbox", "Form", "Scrollbar", "Toast", "CRUD"],
-  "ownership": {"Select/Listbox": "native"},
+  "requiredCapabilities": ["Select/Listbox", "Date", "Form", "Scrollbar", "Toast", "CRUD"],
+  "ownership": {"Select/Listbox": "native", "Date": "native"},
   "requiredCommands": ["unit", "lint", "design"],
   "commands": {
     "unit": "python -m pytest",

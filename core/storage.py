@@ -32,6 +32,8 @@ def servir_media_protegida(request, caminho: str):
     # O prefixo e conferido no destino ja resolvido: no caminho bruto,
     # `acolhidos/fotos/../documentos/x.pdf` passaria pela checagem.
     relativo = destino.relative_to(raiz).as_posix()
+    if relativo.startswith("_rascunhos/"):
+        raise Http404("Arquivo não encontrado.")
     if relativo.startswith(PREFIXOS_SIGILOSOS) and not request.user.pode_ver_ficha_completa():
         raise PermissionDenied("Seu perfil não tem acesso a este documento.")
 

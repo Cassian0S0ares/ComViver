@@ -1,8 +1,6 @@
 from datetime import date
 
-from django.conf import settings
 from django.contrib import messages
-from django.core.files.storage import FileSystemStorage
 from django.db import transaction
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
@@ -32,6 +30,7 @@ from acolhidos.models import (
     StatusAcolhido,
     VinculoFamiliar,
 )
+from core.file_storage import RascunhoAcolhimentoStorage
 from core.mixins import PerfilRequiredMixin, RegistraAcessoFichaMixin
 from core.views import BaseCreateView, BaseListView, BaseUpdateView
 
@@ -168,9 +167,9 @@ class AcolhimentoWizard(PerfilRequiredMixin, SessionWizardView):
     form_list = ETAPAS
     template_name = "acolhidos/acolhido_wizard.html"
     perfis_permitidos = EQUIPE_TECNICA
-    # Fora de MEDIA_ROOT de proposito: a rota /media/ entrega o que estiver la
-    # a qualquer usuario logado, e a foto do rascunho ainda tem o nome original.
-    file_storage = FileSystemStorage(location=settings.ASSISTENTE_TEMP_DIR)
+    # Mantém a foto entre etapas e instâncias do sistema; o rascunho é apagado
+    # quando o assistente termina e não pode ser servido pela rota /media/.
+    file_storage = RascunhoAcolhimentoStorage()
 
     def get_context_data(self, form, **kwargs):
         contexto = super().get_context_data(form=form, **kwargs)

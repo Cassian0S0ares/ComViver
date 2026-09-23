@@ -90,7 +90,11 @@ AUTHENTICATION_BACKENDS = [
 ]
 AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 0.5
-AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+# Bloqueia o IP de quem erra, nao a conta: assim ninguem consegue travar o
+# acesso de outra pessoa so digitando o e-mail dela com senha errada.
+AXES_LOCKOUT_PARAMETERS = ["ip_address"]
+AXES_CLIENT_IP_CALLABLE = "accounts.ip.ip_do_visitante"
+PROXY_COUNT = 0
 AXES_RESET_ON_SUCCESS = True
 AXES_LOCKOUT_TEMPLATE = "accounts/bloqueado.html"
 AXES_HTTP_RESPONSE_CODE = 429
