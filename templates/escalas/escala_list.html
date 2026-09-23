@@ -1,0 +1,22 @@
+{% extends 'base.html' %}{% block titulo %}Escalas{% endblock %}{% block cabecalho %}Escalas{% endblock %}
+{% block conteudo %}<div class="page-heading"><div><span class="eyebrow">ORGANIZAÇÃO DA EQUIPE</span><h1>Escalas</h1><p class="muted">A grade semanal de turnos e voluntários.</p></div>{% if user.e_admin or user.e_operacional %}<a class="button button-primary" href="{% url 'escalas:nova' %}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nova escala</a>{% endif %}</div>
+<section class="surface"><div class="table-heading"><h2>Escalas <span class="count-badge">{{ paginator.count }}</span></h2></div>
+<form class="filter-bar" method="get" novalidate role="search"><div class="search-field"><label class="visually-hidden" for="busca">Buscar por título</label><i class="bi bi-search" aria-hidden="true"></i><input id="busca" type="search" name="q" value="{{ busca }}" placeholder="Buscar por título">{% include 'components/search_clear.html' %}</div><button class="button button-secondary" type="submit">Filtrar</button></form>
+{% if escalas %}<div class="escala-grid">
+{% for escala in escalas %}
+  <a href="{% url 'escalas:grade' escala.pk %}" class="escala-card">
+    <div class="escala-card-header">
+      <h3>{{ escala.titulo }}</h3>
+      <span class="chip {% if escala.esta_publicada %}chip-success{% endif %}">{{ escala.get_status_display }}</span>
+    </div>
+    <p class="muted small">{{ escala.data_inicio|date:"d/m/Y" }} a {{ escala.data_fim|date:"d/m/Y" }}</p>
+    <div class="small">
+      {{ escala.total_turnos }} turno{{ escala.total_turnos|pluralize }}
+      {% if escala.turnos_descobertos %}<span class="escala-card-alerta"> · {{ escala.turnos_descobertos }} sem voluntário</span>{% endif %}
+    </div>
+  </a>
+{% endfor %}
+</div>
+{% if paginator.num_pages > 1 %}<div class="table-footer"><span>{{ page_obj.start_index }}–{{ page_obj.end_index }} de {{ paginator.count }}</span><nav class="pagination-nav" aria-label="Paginação">{% if page_obj.has_previous %}<a class="icon-button" href="?q={{ busca|urlencode }}&amp;page={{ page_obj.previous_page_number }}" aria-label="Página anterior"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>{% endif %}<span aria-current="page">Página {{ page_obj.number }} de {{ paginator.num_pages }}</span>{% if page_obj.has_next %}<a class="icon-button" href="?q={{ busca|urlencode }}&amp;page={{ page_obj.next_page_number }}" aria-label="Próxima página"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>{% endif %}</nav></div>{% endif %}
+{% else %}<div class="empty-state"><i class="bi bi-calendar-week" aria-hidden="true"></i><h3>Nenhuma escala encontrada</h3><p>Monte a primeira escala ou ajuste a busca.</p>{% if busca %}<a class="button button-secondary" href="{% url 'escalas:lista' %}">Limpar busca</a>{% endif %}</div>{% endif %}
+</section>{% endblock %}

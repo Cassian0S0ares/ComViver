@@ -89,6 +89,19 @@ class PainelView(PerfilRequiredMixin, TemplateView):
                     "url": reverse("doacoes:doador_lista") + "?inativos=1",
                 }
             )
+
+        from escalas.services import turnos_descobertos_proximos
+
+        descobertos = turnos_descobertos_proximos(dias=7).count()
+        cartoes.append(
+            {
+                "titulo": "Turnos descobertos",
+                "valor": descobertos,
+                "descricao": "nos próximos 7 dias",
+                "icone": "exclamation-triangle" if descobertos else "calendar-check",
+                "url": reverse("escalas:lista"),
+            }
+        )
         return cartoes
 
 

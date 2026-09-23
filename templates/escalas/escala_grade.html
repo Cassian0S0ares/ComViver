@@ -1,0 +1,100 @@
+{% extends "base.html" %}{% load static %}
+{% block titulo %}{{ escala.titulo }}{% endblock %}
+{% block cabecalho %}<a href="{% url 'escalas:lista' %}">Escalas</a> <span>/</span> {{ escala.titulo }}{% endblock %}
+
+{% block conteudo %}
+<a class="back-link" href="{% url 'escalas:lista' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar para escalas</a>
+
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">{% if escala.esta_publicada %}PUBLICADA{% else %}RASCUNHO{% endif %}</span>
+    <h1>{{ escala.titulo }}</h1>
+    <p class="muted">{{ escala.data_inicio|date:"d/m/Y" }} a {{ escala.data_fim|date:"d/m/Y" }}</p>
+  </div>
+  {% if pode_montar %}
+    <div class="heading-actions">
+      <a href="{% url 'escalas:turno_novo' escala.pk %}" class="button button-secondary">
+        <i class="bi bi-plus-lg" aria-hidden="true"></i> Turno
+      </a>
+      {% if not escala.esta_publicada %}
+        <form method="post" action="{% url 'escalas:publicar' escala.pk %}">
+          {% csrf_token %}
+          <button type="submit" class="button button-primary">Publicar</button>
+        </form>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+<section class="surface grade-surface">
+  <div class="grade-summary">
+    <span class="chip {% if escala.esta_publicada %}chip-success{% endif %}">
+      {{ escala.get_status_display }}
+    </span>
+    {% if escala.turnos_descobertos %}
+      <span class="grade-alerta">
+        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
+        {{ escala.turnos_descobertos }} turno(s) sem voluntário
+      </span>
+    {% else %}
+      <span class="grade-ok">
+        <i class="bi bi-check-circle" aria-hidden="true"></i> Todos os turnos cobertos
+      </span>
+    {% endif %}
+  </div>
+
+  <div class="grade-layout">
+    <div class="table-scroll">
+      <table class="grade-table">
+        <caption class="visually-hidden">Grade semanal de turnos da escala {{ escala.titulo }}</caption>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            {% for dia in dias %}
+              <th scope="col">{{ dia|date:"D" }}<br><span class="muted">{{ dia|date:"d/m" }}</span></th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas %}
+            <tr>
+              <th scope="row">{{ linha.hora_inicio|time:"H:i" }}<br><span class="muted">{{ linha.hora_fim|time:"H:i" }}</span></th>
+              {% for turno in linha.celulas %}
+                <td>
+                  {% if turno %}
+                    {% include "escalas/partials/_celula_turno.html" %}
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="{{ dias|length|add:1 }}">
+                <div class="empty-state">
+                  <p>Nenhum turno nesta escala.
+                  {% if pode_montar %}
+                    <a href="{% url 'escalas:turno_novo' escala.pk %}">Adicionar o primeiro</a>.
+                  {% endif %}
+                  </p>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div id="painel-alocacao" class="grade-painel">
+      {% if pode_montar %}
+        <div class="surface disponiveis-card">
+          <p class="muted small">
+            Clique em <strong>+ vaga</strong> num turno para ver quem está
+            disponível naquele dia e período.
+          </p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+<script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+{% endblock %}

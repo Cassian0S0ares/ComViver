@@ -13,6 +13,7 @@ urlpatterns = [
     path("", include("acolhidos.urls")),
     path("", include("doacoes.urls")),
     path("", include("voluntarios.urls")),
+    path("", include("escalas.urls")),
     path("", include("core.urls")),
 ]
 

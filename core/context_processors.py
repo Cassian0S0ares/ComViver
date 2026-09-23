@@ -33,6 +33,10 @@ def menu(request):
         {"rotulo": "Voluntários", "url": reverse("voluntarios:lista"), "icone": "person-badge"}
     )
 
+    itens.append(
+        {"rotulo": "Escalas", "url": reverse("escalas:lista"), "icone": "calendar-week"}
+    )
+
     if request.user.pode_gerenciar_usuarios():
         itens.append(
             {"rotulo": "Usuários", "url": reverse("accounts:usuario_list"), "icone": "people"}
