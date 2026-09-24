@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: comviver
+    runtime: docker
+    plan: free
+    region: virginia
+    autoDeploy: true
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: PROXY_COUNT
+        value: "1"
+      - key: EMAIL_URL
+        sync: false
+      - key: DEFAULT_FROM_EMAIL
+        sync: false

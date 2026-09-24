@@ -22,6 +22,12 @@ PROXY_COUNT = env.int("PROXY_COUNT", default=0)  # noqa: F405
 # vindo do proprio dominio quando ha proxy HTTPS na frente.
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])  # noqa: F405
 
+# No Render, o endereco publico (*.onrender.com) vem nesta variavel.
+_render_host = env("RENDER_EXTERNAL_HOSTNAME", default="")  # noqa: F405
+if _render_host:
+    ALLOWED_HOSTS = [*ALLOWED_HOSTS, _render_host]  # noqa: F405
+    CSRF_TRUSTED_ORIGINS = [*CSRF_TRUSTED_ORIGINS, f"https://{_render_host}"]
+
 # Falha cedo: DEBUG ligado em producao exibiria a senha do banco na pagina de
 # erro, e SECRET_KEY de exemplo invalidaria toda sessao e token CSRF.
 if DEBUG:

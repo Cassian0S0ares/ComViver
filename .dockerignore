@@ -1,0 +1,17 @@
+.git
+.env
+.env.*
+!.env.example
+.venv/
+.venv312/
+.tools/
+node_modules/
+media/
+staticfiles/
+.assistente/
+test-results/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+*.log
