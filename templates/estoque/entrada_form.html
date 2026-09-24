@@ -1,0 +1,24 @@
+{% extends 'base.html' %}{% load static %}{% block titulo %}Adicionar itens{% endblock %}{% block cabecalho %}<a href="{% url 'estoque:lista' %}">Estoque</a> <span>/</span> Adicionar itens{% endblock %}
+{% block conteudo %}<a class="back-link" href="{% url 'estoque:lista' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar para o estoque</a>
+<div class="page-heading"><div><span class="eyebrow">ENTRADA MANUAL</span><h1>Adicionar itens ao estoque.</h1><p class="muted">Para compras e itens que chegaram sem ser doação. Doações entram sozinhas quando registradas.</p></div></div>
+<div class="form-layout">
+  <section class="surface form-surface">
+    <h2>O que chegou</h2>
+    <p class="muted small">Os campos com * são obrigatórios. A quantidade é sempre em unidades.</p>
+    <form method="post" novalidate data-submit data-dirty data-estoque-campos>
+      {% csrf_token %}
+      <div class="field-grid">{% include 'components/fields.html' %}</div>
+      {% include 'estoque/partials/_campos_item.html' %}
+      <div class="form-actions"><button class="button button-primary" type="submit">Adicionar ao estoque</button><button class="button button-secondary" name="salvar_e_novo" value="1" type="submit">Adicionar e registrar outro</button><a class="button button-secondary" href="{% url 'estoque:lista' %}">Cancelar</a></div>
+    </form>
+  </section>
+  <aside class="form-aside">
+    <span class="state-icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
+    <h2>Tudo em unidades.</h2>
+    <p>Conte o que dá para usar separado: 10 pacotes de arroz são <strong>10 unidades</strong> de "Arroz 5kg".</p>
+    <p>Mesmo nome na mesma categoria soma no mesmo item.</p>
+    <p>Não achou a categoria? <a href="{% url 'estoque:categoria_nova' %}">Crie uma nova <i class="bi bi-arrow-right" aria-hidden="true"></i></a></p>
+  </aside>
+</div>
+<script src="{% static 'js/estoque.js' %}" defer></script>
+{% endblock %}

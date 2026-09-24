@@ -6,6 +6,7 @@ from django.forms import BaseInlineFormSet, inlineformset_factory
 from accounts.forms import FormularioAcessivelMixin
 from accounts.models import Perfil
 from doacoes.models import (
+    TIPOS_DE_ITEM,
     UNIDADES_DOACAO,
     UNIDADES_POR_TIPO,
     Campanha,
@@ -80,8 +81,29 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
         }
 
     def __init__(self, *args, usuario=None, **kwargs):
+        from estoque.forms import campos_de_item
+
         super().__init__(*args, usuario=usuario, **kwargs)
         self.usuario = usuario
+        # Item doado vai direto para o estoque: categoria, item e validade.
+        campos = campos_de_item(obrigatorios=False)
+        self.fields["categoria_estoque"] = campos["categoria"]
+        self.fields["categoria_estoque"].label = "Categoria no estoque"
+        self.fields["item_nome"] = campos["item_nome"]
+        self.fields["validade"] = campos["validade"]
+        lote = getattr(self.instance, "lote_estoque", None) if self.instance.pk else None
+        if lote:
+            self.initial.setdefault("categoria_estoque", lote.item.categoria_id)
+            self.initial.setdefault("item_nome", lote.item.nome)
+            self.initial.setdefault("validade", lote.validade)
+        self.order_fields([
+            "doador", "campanha", "tipo", "categoria_estoque", "item_nome", "descricao",
+            "quantidade", "unidade", "validade", "valor", "data_recebimento", "observacoes",
+        ])
+        self.fields["descricao"].help_text = (
+            "Para itens, é opcional: sem descrição, usa o nome do item."
+        )
+        self.fields["quantidade"].label = "Quantidade (unidades)"
         self.fields["doador"].required = False
         self.fields["doador"].empty_label = "Anônimo"
         self.fields["campanha"].required = False
@@ -114,7 +136,8 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
         # Doacao em dinheiro nao tem quantidade nem unidade: a tela esconde os
         # dois campos, e aqui o valor enviado por engano — ou por POST forjado —
         # e descartado, para nao gravar "20 pacotes de dinheiro".
-        if dados.get("tipo") == TipoDoacao.DINHEIRO:
+        tipo = dados.get("tipo")
+        if tipo == TipoDoacao.DINHEIRO:
             dados["quantidade"] = None
             dados["unidade"] = ""
             self.instance.quantidade = None
@@ -122,7 +145,41 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
         else:
             dados["valor"] = None
             self.instance.valor = None
+        self._limpar_estoque(dados, tipo)
         return dados
+
+    def _limpar_estoque(self, dados, tipo):
+        from estoque.forms import item_existente, limpar_item
+        from estoque.services import conferir_edicao_da_doacao
+
+        self.item_estoque = None
+        if tipo not in TIPOS_DE_ITEM:
+            dados.update(categoria_estoque=None, item_nome="", validade=None)
+        else:
+            # Item e sempre contado em unidades, para o estoque conseguir somar.
+            dados["unidade"] = self.instance.unidade = "unidades"
+            categoria, nome = limpar_item(self, dados, "categoria_estoque")
+            if not categoria:
+                self.add_error("categoria_estoque", "Selecione a categoria do item no estoque.")
+            if not nome:
+                self.add_error("item_nome", "Informe o item doado.")
+            if nome and not (dados.get("descricao") or "").strip():
+                dados["descricao"] = self.instance.descricao = nome
+            self.item_estoque = (categoria, nome) if categoria and nome else None
+        existente = item_existente(*self.item_estoque) if self.item_estoque else None
+        try:
+            conferir_edicao_da_doacao(
+                self.instance, existente if self.item_estoque else None, dados.get("quantidade")
+            )
+        except ValidationError as erro:
+            self.add_error("quantidade" if self.item_estoque else "tipo", erro.messages)
+
+    def sincronizar_estoque(self, doacao, usuario):
+        """Depois de salvar: cria ou ajusta o lote do estoque ligado a esta doacao."""
+        from estoque.services import item_por_nome, sincronizar_doacao
+
+        item = item_por_nome(*self.item_estoque) if self.item_estoque else None
+        return sincronizar_doacao(doacao, item, self.cleaned_data.get("validade"), usuario)
 
 
 class DoadorForm(FormularioDoacoesMixin, forms.ModelForm):

@@ -66,10 +66,10 @@ class TestDoacao:
             tipo=TipoDoacao.ALIMENTO,
             descricao="Arroz 5kg",
             quantidade=20,
-            unidade="pacotes",
+            unidade="unidades",
             valor=None,
         )
-        assert doacao.descricao_quantidade == "20 pacotes"
+        assert doacao.descricao_quantidade == "20 unidades"
 
     def test_descricao_quantidade_de_dinheiro(self):
         doacao = DoacaoFactory(tipo=TipoDoacao.DINHEIRO, valor=Decimal("250.00"), quantidade=None)

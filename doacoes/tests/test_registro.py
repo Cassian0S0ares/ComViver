@@ -6,6 +6,7 @@ from django.urls import reverse
 
 from doacoes.factories import CampanhaFactory, DoadorFactory
 from doacoes.models import Doacao, TipoDoacao
+from estoque.models import CategoriaItem
 
 pytestmark = pytest.mark.django_db
 
@@ -17,7 +18,9 @@ def _dados(**extra):
         "tipo": TipoDoacao.ALIMENTO,
         "descricao": "Arroz 5kg",
         "quantidade": "20",
-        "unidade": "pacotes",
+        "unidade": "unidades",
+        "categoria_estoque": CategoriaItem.objects.get_or_create(nome="Alimentos")[0].pk,
+        "item_nome": "Arroz 5kg",
         "valor": "",
         "data_recebimento": date.today().isoformat(),
         "observacoes": "",

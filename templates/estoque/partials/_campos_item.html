@@ -1,0 +1,1 @@
+<datalist id="itens-estoque">{% for item in itens_catalogo %}<option value="{{ item.nome }}" data-categoria="{{ item.categoria_id }}" data-categoria-nome="{{ item.categoria.nome }}"></option>{% endfor %}</datalist>

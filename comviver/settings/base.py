@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     "doacoes",
     "voluntarios",
     "escalas",
+    "estoque",
 ]
 
 MIDDLEWARE = [

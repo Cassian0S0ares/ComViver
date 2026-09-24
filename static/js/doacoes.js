@@ -84,30 +84,44 @@ if (donationForm) {
   const amount = document.getElementById('id_valor');
   const amountField = donationForm.querySelector('[data-campo="valor"]');
   const description = document.getElementById('id_descricao');
-  // Quantidade e unidade so fazem sentido para doacao em especie.
-  const especie = ['quantidade', 'unidade']
-    .map(nome => donationForm.querySelector(`[data-campo="${nome}"]`))
-    .filter(Boolean);
+  const campo = nome => donationForm.querySelector(`[data-campo="${nome}"]`);
+  const rotulo = (nome, texto, obrigatorio) => {
+    const label = campo(nome)?.querySelector('label');
+    if (label) label.textContent = `${texto}${obrigatorio ? ' *' : ''}`;
+  };
+  // Mostra so o que cabe no tipo: dinheiro pede valor; servico, quantidade e
+  // unidade; itens vao para o estoque com categoria, item e quantidade em unidades.
+  const mostrar = (nome, visivel, obrigatorio = false) => {
+    const bloco = campo(nome);
+    if (!bloco) return;
+    bloco.hidden = !visivel;
+    bloco.querySelectorAll('input, select').forEach(entrada => {
+      entrada.disabled = !visivel;
+      entrada.required = visivel && obrigatorio;
+      if (!visivel && entrada.type !== 'checkbox') entrada.value = '';
+    });
+  };
   const update = () => {
     const money = type.value === 'DINHEIRO';
-    const item = Boolean(type.value) && !money;
-    especie.forEach(campo => {
-      campo.hidden = money;
-      campo.querySelectorAll('input, select').forEach(entrada => {
-        entrada.disabled = money;
-        entrada.required = item;
-        if (money) entrada.value = '';
-      });
-      campo.querySelector('label').textContent = `${campo.dataset.campo === 'quantidade' ? 'Quantidade' : 'Unidade'}${item ? ' *' : ''}`;
-
-    });
+    const servico = type.value === 'SERVICO';
+    const item = Boolean(type.value) && !money && !servico;
+    mostrar('quantidade', Boolean(type.value) && !money, true);
+    mostrar('unidade', servico, true);
+    mostrar('categoria_estoque', item, true);
+    mostrar('item_nome', item, true);
+    if (item) donationForm.dispatchEvent(new Event('estoque:atualizar'));
+    else mostrar('validade', false);
+    rotulo('quantidade', item ? 'Quantidade (unidades)' : 'Quantidade', true);
+    rotulo('unidade', 'Unidade', true);
+    rotulo('categoria_estoque', 'Categoria no estoque', true);
+    rotulo('item_nome', 'Item', true);
     amountField.hidden = !money;
     amount.disabled = !money;
     if (!money) amount.value = '';
     amount.required = money;
-    description.required = Boolean(type.value) && !money;
+    description.required = servico;
     amountField.querySelector('label').textContent = 'Valor em reais *';
-    description.closest('.field').querySelector('label').textContent = `Descrição${type.value && !money ? ' *' : ''}`;
+    rotulo('descricao', 'Descrição', servico);
   };
   type.addEventListener('change', update); update();
 }

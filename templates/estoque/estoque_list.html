@@ -1,0 +1,76 @@
+{% extends 'base.html' %}{% load static %}{% block titulo %}Estoque{% endblock %}{% block cabecalho %}Estoque{% endblock %}
+{% block conteudo %}
+<div class="page-heading">
+  <div>
+    <span class="eyebrow">ESTOQUE DA CASA</span>
+    <h1>O que temos para cuidar.</h1>
+    <p class="muted">Itens disponíveis, contados em unidades. Doações de itens entram aqui automaticamente.</p>
+  </div>
+  {% if pode_abastecer %}
+  <div class="heading-actions">
+    <a class="button button-secondary" href="{% url 'estoque:categoria_nova' %}"><i class="bi bi-tags" aria-hidden="true"></i> Nova categoria</a>
+    <a class="button button-primary" href="{% url 'estoque:entrada' %}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Adicionar itens</a>
+  </div>
+  {% endif %}
+</div>
+
+{% if total_perto_validade %}
+<div class="notice estoque-alerta" role="status"><i class="bi bi-hourglass-split" aria-hidden="true"></i><span><strong>{{ total_perto_validade }} lote{{ total_perto_validade|pluralize }}</strong> vence{{ total_perto_validade|pluralize:'m' }} nos próximos dias ou já venceu. Use primeiro — a baixa sempre tira do que vence antes.</span></div>
+{% endif %}
+
+<section class="surface">
+  <div class="table-heading"><h2>Itens disponíveis <span class="count-badge" data-live-count>{{ paginator.count }}</span></h2></div>
+  <form novalidate class="filter-bar" method="get" role="search" data-live-filter>
+    <div class="search-field"><label class="visually-hidden" for="busca">Buscar item</label><i class="bi bi-search" aria-hidden="true"></i><input type="search" id="busca" name="q" value="{{ busca }}" placeholder="Nome do item">{% include 'components/search_clear.html' %}</div>
+    <label class="visually-hidden" for="filtro-categoria">Categoria</label>
+    <select class="form-select estoque-filtro" id="filtro-categoria" name="categoria">
+      <option value="">Todas as categorias</option>
+      {% for categoria in categorias %}<option value="{{ categoria.pk }}"{% if categoria.pk == categoria_filtrada %} selected{% endif %}>{{ categoria.nome }}</option>{% endfor %}
+    </select>
+    <noscript><button class="button button-secondary" type="submit">Filtrar</button></noscript>
+  </form>
+  <div data-live-results>
+    {% if itens %}
+    <div class="table-scroll">
+      <table class="users-table estoque-tabela">
+        <caption class="visually-hidden">Itens disponíveis no estoque</caption>
+        <thead><tr><th scope="col">Item</th><th scope="col">Categoria</th><th scope="col" class="estoque-num">Quantidade</th><th scope="col">Validade mais próxima</th><th scope="col"><span class="visually-hidden">Ações</span></th></tr></thead>
+        <tbody>
+          {% for item in itens %}
+          <tr>
+            <td><a href="{% url 'estoque:item' item.pk %}"><strong>{{ item.nome }}</strong></a></td>
+            <td><span class="chip">{{ item.categoria.nome }}</span></td>
+            <td class="estoque-num"><strong class="estoque-quantidade">{{ item.disponivel }}</strong> <span class="muted small">un.</span></td>
+            <td>{% include 'estoque/partials/_validade.html' with validade=item.proxima_validade %}</td>
+            <td class="estoque-acoes">
+              <a class="button button-secondary button-small" href="{% url 'estoque:item' item.pk %}#baixa" data-baixa="{% url 'estoque:baixa' item.pk %}" data-baixa-nome="{{ item.nome }}" data-baixa-max="{{ item.disponivel }}"><i class="bi bi-dash-circle" aria-hidden="true"></i> Dar baixa</a>
+              {% if pode_abastecer %}<a class="icon-button" href="{% url 'estoque:entrada' %}?item={{ item.pk }}" aria-label="Adicionar mais {{ item.nome }}"><i class="bi bi-plus-circle" aria-hidden="true"></i></a>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% include 'doacoes/partials/_pagination.html' %}
+    {% else %}
+    <div class="empty-state">
+      <i class="bi bi-box-seam" aria-hidden="true"></i>
+      {% if busca or categoria_filtrada %}<h3>Nada encontrado</h3><p>Nenhum item disponível com esses filtros.</p><a href="{% url 'estoque:lista' %}" class="button button-secondary">Limpar filtros</a>
+      {% else %}<h3>O estoque está vazio.</h3><p>Registre uma doação de itens{% if pode_abastecer %} ou adicione itens manualmente{% endif %} para começar.</p>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<dialog id="baixa-dialog" class="baixa-dialog" aria-labelledby="baixa-titulo" aria-describedby="baixa-ajuda">
+  <h2 id="baixa-titulo">Dar baixa</h2>
+  <p id="baixa-ajuda" class="muted small">Disponível: <strong data-baixa-disponivel></strong> unidade(s). Sai primeiro o que vence antes.</p>
+  <form method="post" novalidate data-baixa-form>
+    {% csrf_token %}
+    <input type="hidden" name="proximo" value="{{ request.get_full_path }}">
+    {% with form=baixa_form %}<div class="field-grid">{% include 'components/fields.html' %}</div>{% endwith %}
+    <div class="actions"><button class="button button-secondary" type="button" data-dialog-close>Cancelar</button><button class="button button-primary" type="submit">Confirmar baixa</button></div>
+  </form>
+</dialog>
+<script src="{% static 'js/estoque.js' %}" defer></script>
+{% endblock %}

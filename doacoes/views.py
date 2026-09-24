@@ -118,7 +118,15 @@ class DoacaoCreateView(BaseCreateView):
 
     def form_valid(self, form):
         form.instance.recebido_por = self.request.user
-        return super().form_valid(form)
+        with transaction.atomic():
+            resposta = super().form_valid(form)
+            form.sincronizar_estoque(self.object, self.request.user)
+        return resposta
+
+    def get_context_data(self, **kwargs):
+        from estoque.models import ItemEstoque
+
+        return super().get_context_data(**kwargs) | {"itens_catalogo": ItemEstoque.objects.select_related("categoria")}
 
     def get_success_url(self):
         if "salvar_e_novo" in self.request.POST:
@@ -136,6 +144,17 @@ class DoacaoUpdateView(BaseUpdateView):
     mensagem_sucesso = "Doação atualizada."
     success_url = reverse_lazy("doacoes:lista")
     perfis_permitidos = QUEM_REGISTRA
+
+    def form_valid(self, form):
+        with transaction.atomic():
+            resposta = super().form_valid(form)
+            form.sincronizar_estoque(self.object, self.request.user)
+        return resposta
+
+    def get_context_data(self, **kwargs):
+        from estoque.models import ItemEstoque
+
+        return super().get_context_data(**kwargs) | {"itens_catalogo": ItemEstoque.objects.select_related("categoria")}
 
 
 class BuscarDoadorView(PerfilRequiredMixin, ListView):

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}{% block titulo %}{{ item.nome }}{% endblock %}{% block cabecalho %}<a href="{% url 'estoque:lista' %}">Estoque</a> <span>/</span> {{ item.nome }}{% endblock %}
+{% block conteudo %}<a class="back-link" href="{% url 'estoque:lista' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar para o estoque</a>
+<div class="page-heading">
+  <div><span class="eyebrow">{{ item.categoria.nome|upper }}</span><h1>{{ item.nome }}</h1><p class="muted"><strong class="estoque-quantidade">{{ disponivel }}</strong> unidade{{ disponivel|pluralize }} disponíve{{ disponivel|pluralize:'l,is' }}</p></div>
+  {% if pode_abastecer %}<div class="heading-actions"><a class="button button-primary" href="{% url 'estoque:entrada' %}?item={{ item.pk }}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Adicionar mais</a></div>{% endif %}
+</div>
+<div class="detail-layout">
+  <div>
+    <section class="surface detail-surface" id="baixa" aria-labelledby="baixa-item-titulo">
+      <h2 id="baixa-item-titulo"><i class="bi bi-dash-circle" aria-hidden="true"></i> Dar baixa</h2>
+      {% if disponivel %}
+      <form method="post" action="{% url 'estoque:baixa' item.pk %}" novalidate data-submit>
+        {% csrf_token %}
+        <input type="hidden" name="proximo" value="{{ request.path }}">
+        {% with form=baixa_form %}{% include 'components/fields.html' %}{% endwith %}
+        <button class="button button-primary" type="submit">Confirmar baixa</button>
+      </form>
+      {% else %}<p class="muted">Nada disponível para retirar.</p>{% endif %}
+    </section>
+  </div>
+  <div>
+    <section class="surface detail-surface" aria-labelledby="lotes-titulo">
+      <h2 id="lotes-titulo"><i class="bi bi-stack" aria-hidden="true"></i> Lotes disponíveis</h2>
+      {% if lotes %}
+      <div class="table-scroll"><table class="users-table">
+        <caption class="visually-hidden">Lotes de {{ item.nome }} com saldo</caption>
+        <thead><tr><th scope="col">Entrada</th><th scope="col">Origem</th><th scope="col">Validade</th><th scope="col" class="estoque-num">Saldo</th></tr></thead>
+        <tbody>{% for lote in lotes %}<tr><td>{{ lote.criado_em|date:'d/m/Y' }}</td><td>{% if lote.doacao %}Doação{% if lote.doacao.doador %} de {{ lote.doacao.doador.nome }}{% else %} anônima{% endif %}{% else %}Entrada manual{% endif %}</td><td>{% include 'estoque/partials/_validade.html' with validade=lote.validade %}</td><td class="estoque-num"><strong>{{ lote.saldo }}</strong> <span class="muted small">de {{ lote.quantidade_inicial }}</span></td></tr>{% endfor %}</tbody>
+      </table></div>
+      {% else %}<p class="muted">Nenhum lote com saldo.</p>{% endif %}
+    </section>
+    <section class="surface detail-surface" aria-labelledby="historico-titulo">
+      <h2 id="historico-titulo"><i class="bi bi-clock-history" aria-hidden="true"></i> Histórico</h2>
+      {% if movimentacoes %}
+      <ol class="plain-list estoque-historico">
+        {% for mov in movimentacoes %}
+        <li class="estoque-mov is-{{ mov.tipo|lower }}"><span class="estoque-mov-qtd">{% if mov.tipo == 'SAIDA' %}−{% elif mov.quantidade > 0 %}+{% endif %}{{ mov.quantidade }}</span><span><strong>{{ mov.get_tipo_display }}</strong>{% if mov.observacao %} · {{ mov.observacao }}{% endif %}<small class="muted">{{ mov.criado_em|date:'d/m/Y H:i' }}{% if mov.usuario %} · {{ mov.usuario.get_full_name|default:mov.usuario.username }}{% endif %}</small></span></li>
+        {% endfor %}
+      </ol>
+      {% else %}<p class="muted">Sem movimentações.</p>{% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

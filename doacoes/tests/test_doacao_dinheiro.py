@@ -5,6 +5,7 @@ from django.urls import reverse
 
 from doacoes.factories import DoacaoFactory
 from doacoes.models import Doacao, TipoDoacao
+from estoque.models import CategoriaItem
 
 pytestmark = pytest.mark.django_db
 
@@ -24,12 +25,16 @@ def _dados(**extra):
     return base | extra
 
 
+def _item():
+    return {"categoria_estoque": CategoriaItem.objects.get_or_create(nome="Alimentos")[0].pk, "item_nome": "Arroz"}
+
+
 class TestDinheiroSemQuantidade:
     def test_quantidade_e_unidade_nao_sao_gravadas(self, client, usuario_operacional):
         """'R$ 500' nao tem quantidade nem unidade; o campo enviado por engano
         (ou por POST forjado) nao pode virar '20 pacotes de dinheiro'."""
         client.force_login(usuario_operacional)
-        resposta = client.post(reverse("doacoes:nova"), _dados(quantidade="20", unidade="pacotes"))
+        resposta = client.post(reverse("doacoes:nova"), _dados(quantidade="20", unidade="unidades"))
         assert resposta.status_code == 302
         doacao = Doacao.objects.get(valor=500)
         assert doacao.quantidade is None
@@ -37,7 +42,7 @@ class TestDinheiroSemQuantidade:
 
     def test_editar_para_dinheiro_limpa_o_que_ja_existia(self, client, usuario_operacional):
         doacao = DoacaoFactory(
-            tipo=TipoDoacao.ALIMENTO, descricao="Arroz", quantidade=20, unidade="pacotes"
+            tipo=TipoDoacao.ALIMENTO, descricao="Arroz", quantidade=20, unidade="unidades"
         )
         client.force_login(usuario_operacional)
         client.post(reverse("doacoes:editar", args=[doacao.pk]), _dados())
@@ -54,13 +59,14 @@ class TestDinheiroSemQuantidade:
                 tipo=TipoDoacao.ALIMENTO,
                 descricao="Arroz 5kg",
                 quantidade="20",
-                unidade="pacotes",
+                unidade="unidades",
                 valor="",
+                **_item(),
             ),
         )
         doacao = Doacao.objects.get(descricao="Arroz 5kg")
         assert doacao.quantidade == 20
-        assert doacao.unidade == "pacotes"
+        assert doacao.unidade == "unidades"
 
     def test_dinheiro_sem_valor_continua_sendo_recusado(self, client, usuario_operacional):
         client.force_login(usuario_operacional)
@@ -79,6 +85,7 @@ class TestDinheiroSemQuantidade:
                 quantidade="1",
                 unidade="unidades",
                 valor="500,00",
+                **_item(),
             ),
         )
         assert resposta.status_code == 302

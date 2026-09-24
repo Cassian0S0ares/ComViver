@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% block titulo %}Nova categoria{% endblock %}{% block cabecalho %}<a href="{% url 'estoque:lista' %}">Estoque</a> <span>/</span> Nova categoria{% endblock %}
+{% block conteudo %}<a class="back-link" href="{% url 'estoque:lista' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar para o estoque</a>
+<div class="page-heading"><div><span class="eyebrow">ESTOQUE DA CASA</span><h1>Nova categoria de itens.</h1><p class="muted">Agrupe os itens por tipo, como Alimentos, Higiene ou Limpeza.</p></div></div>
+<div class="form-layout">
+  <section class="surface form-surface compact">
+    <h2>Dados da categoria</h2>
+    <form method="post" novalidate data-submit data-dirty>
+      {% csrf_token %}
+      <div class="field-grid">{% include 'components/fields.html' %}</div>
+      <div class="form-actions"><button class="button button-primary" type="submit">Criar categoria</button><a class="button button-secondary" href="{% url 'estoque:lista' %}">Cancelar</a></div>
+    </form>
+  </section>
+  <aside class="form-aside">
+    <span class="state-icon"><i class="bi bi-tags" aria-hidden="true"></i></span>
+    <h2>Validade só onde importa.</h2>
+    <p>Com <strong>tem data de validade</strong> marcado, as entradas dessa categoria pedem a validade e aparecem no alerta do painel quando estiverem perto de vencer.</p>
+  </aside>
+</div>
+{% endblock %}

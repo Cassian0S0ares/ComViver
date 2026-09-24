@@ -8,6 +8,7 @@ testpaths = [
     "doacoes/tests",
     "voluntarios/tests",
     "escalas/tests",
+    "estoque/tests",
     "tests",
 ]
 addopts = "--reuse-db -q"

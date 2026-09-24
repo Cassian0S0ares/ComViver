@@ -26,6 +26,7 @@ def menu(request):
             {"rotulo": "Doações", "url": reverse("doacoes:lista"), "icone": "box2-heart"},
             {"rotulo": "Doadores", "url": reverse("doacoes:doador_lista"), "icone": "people"},
             {"rotulo": "Campanhas", "url": reverse("doacoes:campanha_lista"), "icone": "flag"},
+            {"rotulo": "Estoque", "url": reverse("estoque:lista"), "icone": "box-seam"},
         ]
     )
 

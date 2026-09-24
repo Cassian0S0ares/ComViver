@@ -25,42 +25,18 @@ class TipoDoacao(models.TextChoices):
     OUTRO = "OUTRO", "Outro"
 
 
+# Itens contam so em unidades: e o que o estoque consegue somar e dar baixa.
+# Servico nao vai para o estoque e continua podendo ser medido em horas.
 UNIDADES_DOACAO = [
     ("unidades", "Unidade"),
-    ("pacotes", "Pacote"),
-    ("caixas", "Caixa"),
-    ("peças", "Peças"),
-    ("pares", "Par"),
-    ("sacos", "Saco"),
-    ("fardos", "Fardo"),
-    ("quilos", "Quilo"),
-    ("litros", "Litro"),
     ("horas", "Hora"),
 ]
 
+TIPOS_DE_ITEM = (TipoDoacao.ALIMENTO, TipoDoacao.VESTUARIO, TipoDoacao.MATERIAL, TipoDoacao.OUTRO)
+
 UNIDADES_POR_TIPO = {
-    TipoDoacao.ALIMENTO: (
-        "unidades",
-        "pacotes",
-        "caixas",
-        "sacos",
-        "fardos",
-        "quilos",
-        "litros",
-    ),
-    TipoDoacao.VESTUARIO: ("unidades", "peças", "pares"),
-    TipoDoacao.MATERIAL: (
-        "unidades",
-        "pacotes",
-        "caixas",
-        "peças",
-        "pares",
-        "sacos",
-        "quilos",
-        "litros",
-    ),
+    **{tipo: ("unidades",) for tipo in TIPOS_DE_ITEM},
     TipoDoacao.SERVICO: ("unidades", "horas"),
-    TipoDoacao.OUTRO: tuple(valor for valor, _ in UNIDADES_DOACAO),
 }
 
 

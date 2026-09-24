@@ -21,7 +21,20 @@ class PainelView(PerfilRequiredMixin, TemplateView):
         contexto = super().get_context_data(**kwargs)
         contexto["cartoes"] = self._montar_cartoes()
         contexto |= self._meu_dia()
+        contexto |= self._validades()
         return contexto
+
+    def _validades(self) -> dict:
+        """Alimentos e outros itens que vencem nos proximos dias, ou ja venceram."""
+        from django.utils import timezone
+
+        from estoque.services import DIAS_ALERTA_VALIDADE, perto_da_validade
+
+        hoje = timezone.localdate()
+        lotes = perto_da_validade()
+        alertas = [(lote, (lote.validade - hoje).days) for lote in lotes[:6]]
+        return {"validade_alertas": alertas, "validade_total": lotes.count(),
+                "validade_dias": DIAS_ALERTA_VALIDADE}
 
     def _meu_dia(self) -> dict:
         """To-do pessoal do dia, importado dos turnos da escala."""

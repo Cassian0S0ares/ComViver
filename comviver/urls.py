@@ -14,6 +14,7 @@ urlpatterns = [
     path("", include("doacoes.urls")),
     path("", include("voluntarios.urls")),
     path("", include("escalas.urls")),
+    path("", include("estoque.urls")),
     path("", include("core.urls")),
 ]
 
