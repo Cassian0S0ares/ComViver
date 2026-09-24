@@ -75,6 +75,9 @@ DATABASES = {
     "default": {
         **env.db_url_config(env("DATABASE_URL")),
         "CONN_MAX_AGE": 60,
+        # Descarta conexoes derrubadas pelo provedor (ex.: banco que suspende
+        # quando ocioso) em vez de falhar a primeira requisicao.
+        "CONN_HEALTH_CHECKS": True,
         "OPTIONS": {"sslmode": "require"},
     }
 }

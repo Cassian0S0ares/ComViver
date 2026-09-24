@@ -47,3 +47,6 @@ desktop.ini
 node_modules/
 test-results/
 pytest-cache-files-*/
+
+# Ambiente do script de deploy
+.venv-deploy/
