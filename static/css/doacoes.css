@@ -32,3 +32,17 @@
 
 .donation-totals{padding-inline:var(--space-lg)}
 @media(max-width:700px){.donation-totals{padding-inline:var(--space-md)}}
+
+/* Os totais têm espaço proporcional ao conteúdo; dinheiro recebe a área ampla. */
+.donation-totals{grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch}
+.donation-totals>.donation-total{position:relative;min-width:0;min-height:208px;overflow:hidden}
+.donation-totals>.donation-total>span{display:flex;align-items:center;gap:var(--space-sm);min-height:1.5em;overflow-wrap:anywhere}
+.donation-totals>.donation-total>span .bi{color:var(--color-success);font-size:1.1rem}
+.donation-totals>.donation-total>strong{min-width:0;max-width:100%;overflow-wrap:anywhere;font-size:clamp(1.35rem,1.7vw,1.8rem);line-height:1.2;letter-spacing:-.035em}
+.donation-totals>.donation-total>small{margin-top:auto;line-height:1.45}
+.donation-totals>.donation-total.is-money{grid-column:span 2;justify-content:center;padding:var(--space-xl);border-color:var(--color-accent);background:var(--color-accent-soft)}
+.donation-totals>.donation-total.is-money>span{color:var(--color-success);font-weight:650}
+.donation-totals>.donation-total.is-money>strong{font-size:clamp(2rem,3vw,2.75rem);color:var(--color-primary);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+@media(max-width:1100px){.donation-totals{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){.donation-totals{grid-template-columns:repeat(2,minmax(0,1fr))}.donation-totals>.donation-total{min-height:168px}.donation-totals>.donation-total.is-money{grid-column:span 2}}
+@media(max-width:420px){.donation-totals{grid-template-columns:minmax(0,1fr)}.donation-totals>.donation-total.is-money{grid-column:auto}.donation-totals>.donation-total{min-height:unset}}
