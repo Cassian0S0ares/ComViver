@@ -1,100 +1,79 @@
 {% extends "base.html" %}{% load static %}
-{% block titulo %}{{ escala.titulo }}{% endblock %}
-{% block cabecalho %}<a href="{% url 'escalas:lista' %}">Escalas</a> <span>/</span> {{ escala.titulo }}{% endblock %}
-
+{% block titulo %}{{ escala.titulo|default:'Escalas' }}{% endblock %}
+{% block cabecalho %}{% if escala %}<a href="{% url 'escalas:lista' %}">Escalas</a> <span>/</span> {{ escala.titulo }}{% else %}Escalas{% endif %}{% endblock %}
 {% block conteudo %}
-<a class="back-link" href="{% url 'escalas:lista' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar para escalas</a>
-
+{% if escala %}<a class="back-link" href="{% url 'escalas:lista' %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> Voltar para escalas</a>{% endif %}
 <div class="page-heading">
   <div>
-    <span class="eyebrow">{% if escala.esta_publicada %}PUBLICADA{% else %}RASCUNHO{% endif %}</span>
-    <h1>{{ escala.titulo }}</h1>
-    <p class="muted">{{ escala.data_inicio|date:"d/m/Y" }} a {{ escala.data_fim|date:"d/m/Y" }}</p>
+    <span class="eyebrow">CRONOGRAMA DA EQUIPE</span>
+    <h1>{{ escala.titulo|default:'Escalas' }}</h1>
+    <p class="muted">Organize os horários e os responsáveis da equipe.</p>
   </div>
   {% if pode_montar %}
-    <div class="heading-actions">
-      <a href="{% url 'escalas:turno_novo' escala.pk %}" class="button button-secondary">
-        <i class="bi bi-plus-lg" aria-hidden="true"></i> Turno
-      </a>
-      {% if not escala.esta_publicada %}
-        <form method="post" action="{% url 'escalas:publicar' escala.pk %}">
-          {% csrf_token %}
-          <button type="submit" class="button button-primary">Publicar</button>
-        </form>
-      {% endif %}
-    </div>
-  {% endif %}
-</div>
-
-<section class="surface grade-surface">
-  <div class="grade-summary">
-    <span class="chip {% if escala.esta_publicada %}chip-success{% endif %}">
-      {{ escala.get_status_display }}
-    </span>
-    {% if escala.turnos_descobertos %}
-      <span class="grade-alerta">
-        <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-        {{ escala.turnos_descobertos }} turno(s) sem voluntário
-      </span>
-    {% else %}
-      <span class="grade-ok">
-        <i class="bi bi-check-circle" aria-hidden="true"></i> Todos os turnos cobertos
-      </span>
+  <div class="heading-actions">
+    <a href="{{ turno_novo_url }}?data={{ inicio_semana|date:'Y-m-d' }}&amp;hora_inicio=08:00&amp;hora_fim=09:00" class="button button-primary" data-form-dialog="turno-dialog"><i class="bi bi-plus-lg" aria-hidden="true"></i> Adicionar turno</a>
+    {% if escala and not escala.esta_publicada %}
+    <form method="post" action="{% url 'escalas:publicar' escala.pk %}" novalidate>{% csrf_token %}<button type="submit" class="button button-primary">Publicar</button></form>
     {% endif %}
   </div>
-
-  <div class="grade-layout">
-    <div class="table-scroll">
-      <table class="grade-table">
-        <caption class="visually-hidden">Grade semanal de turnos da escala {{ escala.titulo }}</caption>
-        <thead>
-          <tr>
-            <th scope="col"></th>
-            {% for dia in dias %}
-              <th scope="col">{{ dia|date:"D" }}<br><span class="muted">{{ dia|date:"d/m" }}</span></th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for linha in linhas %}
-            <tr>
-              <th scope="row">{{ linha.hora_inicio|time:"H:i" }}<br><span class="muted">{{ linha.hora_fim|time:"H:i" }}</span></th>
-              {% for turno in linha.celulas %}
-                <td>
-                  {% if turno %}
-                    {% include "escalas/partials/_celula_turno.html" %}
-                  {% endif %}
-                </td>
-              {% endfor %}
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="{{ dias|length|add:1 }}">
-                <div class="empty-state">
-                  <p>Nenhum turno nesta escala.
-                  {% if pode_montar %}
-                    <a href="{% url 'escalas:turno_novo' escala.pk %}">Adicionar o primeiro</a>.
-                  {% endif %}
-                  </p>
-                </div>
-              </td>
-            </tr>
+  {% endif %}
+</div>
+<section class="surface grade-surface" aria-labelledby="cronograma-titulo">
+  <div class="table-heading">
+    <div><h2 id="cronograma-titulo">{{ inicio_semana|date:'d/m' }} a {{ fim_semana|date:'d/m/Y' }}</h2><span class="muted small">Domingo a sábado · {{ total_turnos }} turno{{ total_turnos|pluralize }}</span></div>
+    <nav class="heading-actions" aria-label="Navegar pelo calendário">
+      {% if semana_anterior %}<a class="icon-button" aria-label="Semana anterior" href="?semana={{ semana_anterior|date:'Y-m-d' }}"><i class="bi bi-chevron-left" aria-hidden="true"></i></a>{% endif %}
+      {% if not escala %}<a class="button button-secondary button-small" href="{% url 'escalas:lista' %}">Hoje</a>{% endif %}
+      {% if semana_seguinte %}<a class="icon-button" aria-label="Próxima semana" href="?semana={{ semana_seguinte|date:'Y-m-d' }}"><i class="bi bi-chevron-right" aria-hidden="true"></i></a>{% endif %}
+    </nav>
+  </div>
+  <p id="cronograma-ajuda" class="muted small">{% if pode_montar %}Clique no horário de um dia para adicionar a atividade e o responsável. {% endif %}Os blocos mostram o início e o término de cada turno; clique em um deles para ver os detalhes. Role a grade para ver todos os horários.</p>
+  <div class="grade-summary">
+    {% if not total_turnos %}<span class="muted small">Nenhum turno cadastrado. A grade está pronta para preencher.</span>
+    {% elif turnos_descobertos %}<span class="grade-alerta"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i>{{ turnos_descobertos }} turno(s) com vagas em aberto</span>
+    {% else %}<span class="grade-ok"><i class="bi bi-check-circle" aria-hidden="true"></i> Todos os turnos cobertos</span>{% endif %}
+  </div>
+  <div class="cronograma-scroll" tabindex="0" role="region" aria-label="Horários da semana" aria-describedby="cronograma-ajuda" data-cronograma>
+    <div class="cronograma">
+      <div class="cronograma-horas">
+        <div class="cronograma-cabecalho">Hora</div>
+        {% for hora in horas %}<div class="cronograma-hora">{{ hora.rotulo }}</div>{% endfor %}
+      </div>
+      {% for coluna in colunas %}
+      <section class="cronograma-dia" aria-label="{{ coluna.data|date:'l, d/m/Y' }}" style="--faixas: {{ coluna.faixas }}">
+        <h3 class="cronograma-cabecalho">{{ coluna.data|date:"D" }}<span>{{ coluna.data|date:"d/m" }}</span></h3>
+        <div class="cronograma-dia-horas">
+          {% for hora in horas %}
+            {% if pode_montar and coluna.ativo %}
+            <a class="cronograma-slot" data-form-dialog="turno-dialog" style="grid-row: {{ hora.inicio }} / {{ hora.linha_fim }}" href="{{ turno_novo_url }}?data={{ coluna.data|date:'Y-m-d' }}&amp;hora_inicio={{ hora.rotulo }}&amp;hora_fim={{ hora.fim }}" aria-label="Adicionar turno em {{ coluna.data|date:'d/m/Y' }} às {{ hora.rotulo }}"><span aria-hidden="true">+</span></a>
+            {% else %}<div class="cronograma-slot {% if not coluna.ativo %}is-fora-periodo{% endif %}" style="grid-row: {{ hora.inicio }} / {{ hora.linha_fim }}">{% if not coluna.ativo and forloop.first %}<span class="small">Fora do período</span>{% endif %}</div>{% endif %}
           {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <div id="painel-alocacao" class="grade-painel">
-      {% if pode_montar %}
-        <div class="surface disponiveis-card">
-          <p class="muted small">
-            Clique em <strong>+ vaga</strong> num turno para ver quem está
-            disponível naquele dia e período.
-          </p>
+          {% for evento in coluna.eventos %}
+          <div class="cronograma-evento" style="grid-row: {{ evento.inicio }} / {{ evento.fim }}; grid-column: {{ evento.faixa }}">
+            {% include 'escalas/partials/_celula_turno.html' with turno=evento.turno %}
+          </div>
+          {% endfor %}
         </div>
-      {% endif %}
+      </section>
+      {% endfor %}
     </div>
   </div>
 </section>
+<dialog class="turno-dialog turno-detalhe-dialog" id="turno-detalhe" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' aria-labelledby="turno-detalhe-titulo" aria-describedby="turno-detalhe-ajuda">
+  <button type="button" class="icon-button turno-detalhe-fechar" data-turno-detalhe-fechar aria-label="Fechar detalhes"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+  <div id="turno-detalhe-conteudo"></div>
+</dialog>
+{% if pode_montar %}
+<dialog class="turno-dialog" data-form-dialog-owner id="turno-dialog" aria-labelledby="turno-dialog-titulo" aria-describedby="turno-dialog-ajuda">
+  <h2 id="turno-dialog-titulo">Adicionar turno</h2>
+  <p id="turno-dialog-ajuda" class="muted small">Defina a atividade, o responsável e o período. Os campos com * são obrigatórios.</p>
+  <form method="post" action="{{ turno_novo_url }}" novalidate data-submit data-dirty>
+    {% csrf_token %}
+    <div class="field-grid">{% include 'components/fields.html' %}</div>
+    <div class="form-actions"><button class="button button-primary" type="submit">Salvar turno</button><button class="button button-secondary" type="button" disabled data-enhancement data-form-dialog-cancel>Cancelar</button></div>
+  </form>
+</dialog>
+{% endif %}
 <script src="{% static 'vendor/htmx.min.js' %}" defer></script>
+<script src="{% static 'js/escalas.js' %}" defer></script>
 {% endblock %}

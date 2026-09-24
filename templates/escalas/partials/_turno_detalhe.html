@@ -1,0 +1,69 @@
+<header class="turno-modal-topo {% if turno.esta_descoberto %}is-descoberto{% endif %}">
+  <span class="turno-modal-icone" aria-hidden="true"><i class="bi bi-calendar2-week"></i></span>
+  <div class="turno-modal-titulos">
+    <span class="eyebrow">{{ turno.data|date:'l · d \d\e F' }}</span>
+    <h2 id="turno-detalhe-titulo" tabindex="-1">{{ turno.atividade.nome }}</h2>
+    <p id="turno-detalhe-ajuda" class="turno-modal-horario"><i class="bi bi-clock" aria-hidden="true"></i> {{ turno.hora_inicio|time:'H:i' }} – {{ turno.hora_fim|time:'H:i' }} <span class="turno-modal-duracao">{{ turno.duracao }}</span></p>
+  </div>
+</header>
+
+<section class="turno-modal-bloco" aria-labelledby="turno-vagas-titulo">
+  <div class="turno-modal-bloco-cabecalho">
+    <h3 id="turno-vagas-titulo">Vagas</h3>
+    {% if turno.esta_descoberto %}<span class="turno-modal-status is-aberto"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> {{ turno.vagas_livres }} em aberto</span>
+    {% else %}<span class="turno-modal-status is-coberto"><i class="bi bi-check-circle" aria-hidden="true"></i> Coberto</span>{% endif %}
+  </div>
+  <div class="turno-modal-progresso" role="img" aria-label="{{ turno.vagas_ocupadas }} de {{ turno.vagas }} vagas preenchidas"><span style="width: {{ turno.percentual_ocupado }}%"></span></div>
+  <p class="muted small">{{ turno.vagas_ocupadas }} de {{ turno.vagas }} vaga{{ turno.vagas|pluralize }} preenchida{{ turno.vagas|pluralize }}</p>
+</section>
+
+<section class="turno-modal-bloco" aria-labelledby="turno-pessoas-titulo">
+  <div class="turno-modal-bloco-cabecalho">
+    <h3 id="turno-pessoas-titulo" tabindex="-1">Responsáveis <span class="turno-modal-contagem">{{ responsaveis|length }}/{{ turno.vagas }}</span></h3>
+    {% if user.e_admin %}
+    <button type="button" class="button button-secondary button-small" hx-get="{% url 'escalas:disponiveis' turno.pk %}" hx-target="#turno-adicionar"><i class="bi bi-person-plus" aria-hidden="true"></i> Adicionar pessoa</button>
+    {% elif not ja_escalado %}
+    <button type="button" class="button button-secondary button-small" hx-post="{% url 'escalas:alocar' turno.pk %}" hx-target="#turno-detalhe-conteudo"><i class="bi bi-person-plus" aria-hidden="true"></i> Me adicionar</button>
+    {% endif %}
+  </div>
+  {% if erro %}
+  <div class="notice notice-danger turno-modal-erro" role="alert" tabindex="-1" data-form-error>
+    <i class="bi bi-exclamation-circle" aria-hidden="true"></i>
+    <div>{% for mensagem in erro %}<p>{{ mensagem }}</p>{% endfor %}
+      {% if pode_gerenciar and responsaveis|length >= turno.vagas %}<button type="button" class="button button-secondary button-small" hx-get="{% url 'escalas:turno_editar' turno.pk %}" hx-target="#turno-detalhe-conteudo"><i class="bi bi-pencil" aria-hidden="true"></i> Editar vagas</button>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  <div id="turno-adicionar"></div>
+  <ol class="turno-modal-pessoas">
+    {% for alocacao, pode_remover in responsaveis %}
+    <li>
+      <span class="turno-modal-avatar" aria-hidden="true">{{ alocacao.nome_responsavel|make_list|first|upper }}</span>
+      <span class="turno-modal-pessoa-nome">{{ alocacao.nome_responsavel }}{% if alocacao.usuario_id == user.pk %} <em>(você)</em>{% endif %}<small>{% if alocacao.usuario_id %}Equipe{% else %}Voluntário{% endif %}</small></span>
+      {% if pode_remover %}<button type="button" class="icon-button turno-modal-remover" hx-post="{% url 'escalas:desalocar' alocacao.pk %}" hx-target="#turno-detalhe-conteudo" aria-label="{% if alocacao.usuario_id == user.pk %}Sair deste turno{% else %}Remover {{ alocacao.nome_responsavel }} do turno{% endif %}"><i class="bi bi-x-lg" aria-hidden="true"></i></button>{% endif %}
+    </li>
+    {% empty %}
+    <li class="turno-modal-vazio"><i class="bi bi-person-dash" aria-hidden="true"></i> Ainda sem responsável</li>
+    {% endfor %}
+  </ol>
+</section>
+
+{% if turno.observacoes %}
+<section class="turno-modal-bloco" aria-labelledby="turno-obs-titulo">
+  <h3 id="turno-obs-titulo">Observações</h3>
+  <p class="turno-modal-observacoes">{{ turno.observacoes }}</p>
+</section>
+{% endif %}
+
+<footer class="turno-modal-rodape">
+  <p class="muted small"><i class="bi bi-person" aria-hidden="true"></i> {% if turno.criado_por %}Criado por {{ turno.criado_por.get_full_name|default:turno.criado_por.username }}{% else %}Autor não registrado{% endif %}{% if turno.criado_em %} em {{ turno.criado_em|date:'d/m/Y' }}{% endif %}</p>
+  {% if pode_gerenciar %}
+  <div class="turno-modal-acoes">
+    <button type="button" class="button button-secondary danger-link" hx-get="{% url 'escalas:turno_excluir' turno.pk %}" hx-target="#turno-detalhe-conteudo"><i class="bi bi-trash" aria-hidden="true"></i> Excluir</button>
+    <button type="button" class="button button-primary" hx-get="{% url 'escalas:turno_editar' turno.pk %}" hx-target="#turno-detalhe-conteudo"><i class="bi bi-pencil" aria-hidden="true"></i> Editar</button>
+  </div>
+  {% else %}
+  <p class="muted small turno-modal-aviso"><i class="bi bi-lock" aria-hidden="true"></i> Só quem criou o turno ou um administrador pode editar ou excluir.</p>
+  {% endif %}
+</footer>
+{% if atualizar_celula %}{% include 'escalas/partials/_celula_turno.html' with oob=True %}{% endif %}

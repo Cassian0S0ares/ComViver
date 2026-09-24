@@ -1,0 +1,19 @@
+<header class="turno-modal-topo">
+  <span class="turno-modal-icone" aria-hidden="true"><i class="bi bi-pencil-square"></i></span>
+  <div class="turno-modal-titulos">
+    <span class="eyebrow">{{ turno.atividade.nome }}</span>
+    <h2 id="turno-detalhe-titulo" tabindex="-1">Editar turno</h2>
+    <p id="turno-detalhe-ajuda" class="muted small">Os horários vão de meia em meia hora. Você pode adicionar um responsável enquanto houver vaga. Campos com * são obrigatórios.</p>
+  </div>
+</header>
+<form method="post" hx-post="{% url 'escalas:turno_editar' turno.pk %}" hx-target="#turno-detalhe-conteudo" novalidate>
+  {% csrf_token %}
+  <div class="field-grid">{% include 'components/fields.html' %}</div>
+  <div class="turno-modal-rodape">
+    <span></span>
+    <div class="turno-modal-acoes">
+      <button type="button" class="button button-secondary" hx-get="{% url 'escalas:turno_detalhe' turno.pk %}" hx-target="#turno-detalhe-conteudo">Cancelar</button>
+      <button class="button button-primary" type="submit"><i class="bi bi-check-lg" aria-hidden="true"></i> Salvar alterações</button>
+    </div>
+  </div>
+</form>

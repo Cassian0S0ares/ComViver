@@ -192,6 +192,35 @@ document.querySelectorAll('a[href]').forEach(link => {
 document.querySelector('[data-discard]')?.addEventListener('click', () => {
   dirty = false; unsavedDialog.close(); destination?.();
 });
+// Calendar and other contextual forms reuse the native dialog and dirty guard.
+document.querySelectorAll('[data-form-dialog]').forEach(link => {
+  link.addEventListener('click', event => {
+    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    const dialog = document.getElementById(link.dataset.formDialog);
+    const form = dialog?.querySelector('form');
+    if (!form) return;
+    event.preventDefault();
+    form.reset();
+    const url = new URL(link.href);
+    form.action = url.href;
+    for (const [name, value] of url.searchParams) {
+      const field = form.elements.namedItem(name);
+      if (field) field.value = value;
+    }
+    dialog.showModal();
+    form.querySelector('[name=responsavel]')?.focus();
+  });
+});
+document.querySelectorAll('dialog[data-form-dialog-owner]').forEach(dialog => {
+  const close = event => {
+    event.preventDefault();
+    const discard = () => { dialog.querySelector('form').reset(); dialog.close(); };
+    if (dirty) { destination = discard; unsavedDialog.showModal(); }
+    else discard();
+  };
+  dialog.addEventListener('cancel', close);
+  dialog.querySelector('[data-form-dialog-cancel]')?.addEventListener('click', close);
+});
 const permissionForm = document.querySelector('[data-permission-confirm]');
 const permissionDialog = document.getElementById('permission-dialog');
 const initialProfile = permissionForm?.querySelector('[name=perfil]')?.value;

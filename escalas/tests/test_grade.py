@@ -80,15 +80,15 @@ class TestTelaDaGrade:
         )
         assert resposta.status_code == 403
 
-    def test_operacional_aloca(self, client, usuario_operacional):
+    def test_admin_aloca(self, client, usuario_admin):
         escala = EscalaFactory()
         turno = TurnoFactory(escala=escala)
         voluntario = VoluntarioFactory()
-        client.force_login(usuario_operacional)
+        client.force_login(usuario_admin)
         client.post(reverse("escalas:alocar", args=[turno.pk]), {"voluntario": voluntario.pk})
         assert Alocacao.objects.filter(turno=turno, voluntario=voluntario).exists()
 
-    def test_alocacao_conflitante_devolve_mensagem(self, client, usuario_operacional):
+    def test_alocacao_conflitante_devolve_mensagem(self, client, usuario_admin):
         hoje = date.today()
         escala = EscalaFactory()
         voluntario = VoluntarioFactory(nome="Ana Souza")
@@ -100,14 +100,14 @@ class TestTelaDaGrade:
             escala=escala, data=hoje, hora_inicio=time(10, 0), hora_fim=time(14, 0)
         )
 
-        client.force_login(usuario_operacional)
+        client.force_login(usuario_admin)
         resposta = client.post(
             reverse("escalas:alocar", args=[novo.pk]), {"voluntario": voluntario.pk}
         )
         assert "já está escalada" in resposta.content.decode()
         assert Alocacao.objects.filter(turno=novo).count() == 0
 
-    def test_mensagem_de_conflito_escapa_o_nome(self, client, usuario_operacional):
+    def test_mensagem_de_conflito_escapa_o_nome(self, client, usuario_admin):
         """O nome do voluntario entra na mensagem de erro. Sem escape, um nome
         com marcacao viraria XSS refletido em quem monta a escala."""
         hoje = date.today()
@@ -121,7 +121,7 @@ class TestTelaDaGrade:
             escala=escala, data=hoje, hora_inicio=time(10, 0), hora_fim=time(14, 0)
         )
 
-        client.force_login(usuario_operacional)
+        client.force_login(usuario_admin)
         resposta = client.post(
             reverse("escalas:alocar", args=[novo.pk]), {"voluntario": voluntario.pk}
         )
@@ -129,21 +129,21 @@ class TestTelaDaGrade:
         assert "<script>alert(1)</script>" not in conteudo
         assert "&lt;script&gt;" in conteudo
 
-    def test_alocar_voluntario_inativo_e_recusado(self, client, usuario_operacional):
+    def test_alocar_voluntario_inativo_e_recusado(self, client, usuario_admin):
         from voluntarios.models import StatusVoluntario
 
         turno = TurnoFactory()
         inativo = VoluntarioFactory(status=StatusVoluntario.INATIVO)
-        client.force_login(usuario_operacional)
+        client.force_login(usuario_admin)
         resposta = client.post(
             reverse("escalas:alocar", args=[turno.pk]), {"voluntario": inativo.pk}
         )
         assert resposta.status_code == 404
         assert not Alocacao.objects.filter(turno=turno).exists()
 
-    def test_desalocar_remove_a_alocacao(self, client, usuario_operacional):
+    def test_desalocar_remove_a_alocacao(self, client, usuario_admin):
         alocacao = AlocacaoFactory()
-        client.force_login(usuario_operacional)
+        client.force_login(usuario_admin)
         client.post(reverse("escalas:desalocar", args=[alocacao.pk]))
         assert not Alocacao.objects.filter(pk=alocacao.pk).exists()
 
@@ -216,7 +216,8 @@ class TestEscalaSempreSemanal:
             },
         )
         escala = Escala.objects.get(titulo="Semana teste")
-        assert escala.data_fim == inicio + timedelta(days=6)
+        assert escala.data_inicio == date(2026, 9, 20)
+        assert escala.data_fim == date(2026, 9, 26)
 
 
 class TestSanidadeDasPaginas:

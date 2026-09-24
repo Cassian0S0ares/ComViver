@@ -1,0 +1,1 @@
+Nova atividade na sua escala: {{ turno.atividade.nome }} · ComViver

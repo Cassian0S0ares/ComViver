@@ -20,7 +20,30 @@ class PainelView(PerfilRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
         contexto["cartoes"] = self._montar_cartoes()
+        contexto |= self._meu_dia()
         return contexto
+
+    def _meu_dia(self) -> dict:
+        """To-do pessoal do dia, importado dos turnos da escala."""
+        from datetime import date, timedelta
+
+        from django.utils import timezone
+
+        from escalas.services import agenda_do_dia, proximo_turno
+
+        hoje = timezone.localdate()
+        try:
+            dia = date.fromisoformat(self.request.GET.get("dia", ""))
+        except ValueError:
+            dia = hoje
+        agenda = agenda_do_dia(self.request.user, dia)
+        return {
+            "agenda": agenda, "agenda_dia": dia, "agenda_e_hoje": dia == hoje,
+            "agenda_feitos": sum(item.feito for item in agenda),
+            "agenda_anterior": dia - timedelta(days=1),
+            "agenda_seguinte": dia + timedelta(days=1),
+            "agenda_proximo": None if agenda else proximo_turno(self.request.user, dia),
+        }
 
     def _montar_cartoes(self) -> list[dict]:
         from django.utils import timezone

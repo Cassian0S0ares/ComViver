@@ -129,3 +129,37 @@ No formulário, a meta em dinheiro fica na seção Metas e mostra apenas o valor
 reais. Metas de itens mostram tipo, quantidade e unidade. O botão Remover meta
 aparece apenas quando há mais de uma meta visível; ao remover uma meta existente,
 o formulário marca sua exclusão para o salvamento.
+
+## Calendário de escalas
+
+O menu Escalas abre diretamente `/escalas/`, com a semana atual de domingo a
+sábado e todos os turnos existentes no período, independentemente da escala
+de origem. Semana anterior, próxima semana e Hoje navegam pelo calendário;
+`semana` na URL preserva a semana consultada. Não é necessário criar uma escala
+antes de preencher o calendário. O primeiro turno cria o agrupamento semanal
+no mesmo salvamento, quando não existe um período correspondente.
+
+A grade tem sete colunas e uma régua de 24 horas com rolagem própria. Um clique
+no horário abre o formulário em um `dialog` nativo; sem JavaScript, o mesmo link
+abre a página de cadastro. Data e horário vêm preenchidos; responsável, atividade,
+término, vagas e observações usam os campos compartilhados. O responsável pode
+ser definido depois. Salvar grava turno e alocação na mesma transação, impede
+conflitos e retorna à semana e ao horário do item salvo. Erros preservam os
+valores no formulário completo, com foco no primeiro campo inválido.
+
+`comviver.js` é o responsável compartilhado pelos diálogos de formulário
+(`data-form-dialog`) e reutiliza a confirmação de alterações não salvas ao
+cancelar ou pressionar Escape. Admin e Operacional preenchem o calendário;
+Técnico consulta. Turnos simultâneos aparecem em faixas paralelas; a altura
+representa a duração real. Conteúdo extenso e turnos curtos têm rolagem interna.
+Escalas antigas mantêm suas datas e podem ser consultadas pelos links existentes.
+
+Verificação: `escalas/tests/test_cronograma.py` e `tests/browser_escalas.py`.
+
+O responsável pode ser um usuário ativo do sistema ou um voluntário ativo.
+O select agrupa os dois tipos e a alocação armazena exatamente um deles,
+com o mesmo controle de vagas e conflitos de horário. Escolher alguém como
+responsável não modifica suas permissões. Atividades iniciais são cadastradas
+por migração, sem substituir registros existentes: acompanhamento escolar,
+recreação, cozinha e alimentação, limpeza e organização, portaria e recepção,
+apoio à rotina, atendimento técnico e reunião de equipe.

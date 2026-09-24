@@ -1,24 +1,23 @@
-<div class="surface disponiveis-card">
-  <div class="disponiveis-card-header">
-    <strong>{{ turno }}</strong>
-    <p class="muted small">Voluntários disponíveis neste dia e turno</p>
+<div class="turno-modal-escolha" role="group" aria-labelledby="turno-escolha-titulo">
+  <div class="turno-modal-bloco-cabecalho">
+    <strong id="turno-escolha-titulo">Quem está livre neste horário</strong>
+    <button type="button" class="icon-button" hx-get="{% url 'escalas:turno_detalhe' turno.pk %}" hx-target="#turno-detalhe-conteudo" aria-label="Fechar lista de pessoas"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
   </div>
-  <div class="disponiveis-lista">
-    {% for voluntario in voluntarios %}
-      <button type="button" class="disponiveis-item"
-              hx-post="{% url 'escalas:alocar' turno.pk %}"
-              hx-vals='{"voluntario": "{{ voluntario.pk }}"}'
-              hx-target="#turno-{{ turno.pk }}"
-              hx-swap="outerHTML"
-              hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
-        <span class="disponiveis-item-nome">{{ voluntario.nome }}</span>
-        <span class="disponiveis-item-info muted small">{{ voluntario.resumo_disponibilidade }}</span>
-      </button>
-    {% empty %}
-      <p class="muted small disponiveis-vazio">
-        Nenhum voluntário disponível para este dia e turno.
-        Verifique a disponibilidade declarada nos cadastros.
-      </p>
+  <div class="turno-modal-escolha-lista">
+    {% for usuario in usuarios %}
+    <button type="button" class="disponiveis-item" hx-post="{% url 'escalas:alocar' turno.pk %}" hx-vals='{"usuario": "{{ usuario.pk }}"}' hx-target="#turno-detalhe-conteudo">
+      <span class="disponiveis-item-nome">{{ usuario.get_full_name|default:usuario.username }}</span>
+      <span class="disponiveis-item-info muted small">Equipe · {{ usuario.get_perfil_display }}</span>
+    </button>
     {% endfor %}
+    {% for voluntario in voluntarios %}
+    <button type="button" class="disponiveis-item" hx-post="{% url 'escalas:alocar' turno.pk %}" hx-vals='{"voluntario": "{{ voluntario.pk }}"}' hx-target="#turno-detalhe-conteudo">
+      <span class="disponiveis-item-nome">{{ voluntario.nome }}</span>
+      <span class="disponiveis-item-info muted small">Voluntário · {{ voluntario.resumo_disponibilidade }}</span>
+    </button>
+    {% endfor %}
+    {% if not usuarios and not voluntarios %}
+    <p class="muted small disponiveis-vazio">Ninguém livre neste dia e horário. Verifique a disponibilidade declarada nos cadastros.</p>
+    {% endif %}
   </div>
 </div>

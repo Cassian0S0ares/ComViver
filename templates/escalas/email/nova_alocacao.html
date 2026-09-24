@@ -1,0 +1,50 @@
+{% autoescape on %}<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Nova atividade no ComViver</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f0f6fa;color:#1d303e;font-family:'Segoe UI',Helvetica,Arial,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:#f0f6fa;">Nova atividade na sua escala: {{ turno.atividade.nome }}.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f6fa;">
+<tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:560px;background-color:#fcfeff;border:1px solid #d1dde5;border-radius:16px;overflow:hidden;">
+<tr><td align="center" style="padding:32px;background-color:#1b3c50;">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr><td align="center" style="width:96px;height:96px;border-radius:48px;background-color:#ffffff;"><img src="cid:{{ logo_cid }}" width="80" height="80" alt="Lar Padre José Gumercindo" style="display:block;margin:8px;border:0;"></td></tr></table>
+<p style="margin:16px 0 0;font-size:27px;line-height:1.2;color:#f4fafc;letter-spacing:-0.5px;"><strong>Com</strong>Viver</p>
+<p style="margin:4px 0 0;font-size:12px;line-height:1.5;color:#aec1cb;letter-spacing:2px;text-transform:uppercase;">Lar Padre José Gumercindo</p>
+</td></tr>
+<tr><td style="height:6px;line-height:6px;font-size:0;background-color:#91c9b0;">&nbsp;</td></tr>
+<tr><td style="padding:36px 40px 20px;">
+<p style="margin:0 0 10px;font-size:12px;font-weight:700;line-height:1.5;letter-spacing:2px;color:#426777;text-transform:uppercase;">Nova atividade</p>
+<h1 style="margin:0 0 20px;font-size:27px;line-height:1.25;letter-spacing:-0.5px;color:#1b3c50;">Nova atividade na sua escala</h1>
+<p style="margin:0 0 16px;font-size:16px;line-height:1.6;">Olá{% if pessoa.first_name %}, <strong>{{ pessoa.first_name }}</strong>{% elif pessoa.nome %}, <strong>{{ pessoa.nome }}</strong>{% endif %}!</p>
+<p style="margin:0;font-size:16px;line-height:1.6;">Veja os detalhes da atividade em que você vai participar:</p>
+</td></tr>
+<tr><td style="padding:0 40px 32px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0f6fa;border:1px solid #d1dde5;border-radius:12px;">
+<tr><td style="padding:18px 20px 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#526370;">Tipo da atividade</td></tr>
+<tr><td style="padding:0 20px 16px;font-size:18px;font-weight:700;line-height:1.5;color:#1b3c50;">{{ turno.atividade.nome }}</td></tr>
+<tr><td style="padding:0 20px;"><div style="border-top:1px solid #d1dde5;"></div></td></tr>
+<tr><td style="padding:16px 20px 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#526370;">Quando</td></tr>
+<tr><td style="padding:0 20px 16px;font-size:16px;line-height:1.5;">{{ turno.data|date:"d/m/Y" }} · {{ turno.hora_inicio|time:"H:i" }} às {{ turno.hora_fim|time:"H:i" }}</td></tr>
+<tr><td style="padding:0 20px;"><div style="border-top:1px solid #d1dde5;"></div></td></tr>
+<tr><td style="padding:16px 20px 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#526370;">Quem vai</td></tr>
+<tr><td style="padding:0 20px 16px;font-size:16px;line-height:1.5;">{% for nome in responsaveis %}{{ nome }}{% if not forloop.last %}, {% endif %}{% endfor %}</td></tr>
+<tr><td style="padding:0 20px;"><div style="border-top:1px solid #d1dde5;"></div></td></tr>
+{% if turno.observacoes %}<tr><td style="padding:0 20px;"><div style="border-top:1px solid #d1dde5;"></div></td></tr>
+<tr><td style="padding:16px 20px 4px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#526370;">Observações do turno</td></tr>
+<tr><td style="padding:0 20px 18px;font-size:16px;line-height:1.6;white-space:pre-line;">{{ turno.observacoes }}</td></tr>{% endif %}
+</table>
+</td></tr>
+<tr><td style="padding:20px 40px;background-color:#f0f6fa;border-top:1px solid #d1dde5;">
+<p style="margin:0;color:#526370;font-size:13px;line-height:1.6;">Se tiver alguma dúvida, procure a coordenação da instituição.</p>
+</td></tr>
+</table>
+<p style="margin:20px 0 0;color:#526370;font-size:12px;line-height:1.5;text-align:center;">Lar Padre José Gumercindo · ComViver<br>Mensagem automática, não precisa responder.</p>
+</td></tr>
+</table>
+</body>
+</html>{% endautoescape %}

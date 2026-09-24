@@ -120,6 +120,25 @@ class Turno(SoftDeleteModel):
             return False
         return self.hora_inicio < outro.hora_fim and outro.hora_inicio < self.hora_fim
 
+    def pode_ser_gerenciado_por(self, usuario) -> bool:
+        """Editar e excluir cabem a quem criou o turno ou a um administrador."""
+        return usuario.e_admin or (
+            self.criado_por_id is not None and self.criado_por_id == usuario.pk
+        )
+
+    @property
+    def duracao(self) -> str:
+        minutos = (self.hora_fim.hour * 60 + self.hora_fim.minute
+                   - self.hora_inicio.hour * 60 - self.hora_inicio.minute)
+        if self.hora_fim.minute == 59:  # 23:59 marca o fim do dia
+            minutos += 1
+        horas, resto = divmod(minutos, 60)
+        return f"{horas}h{resto:02d}" if horas and resto else f"{horas}h" if horas else f"{resto} min"
+
+    @property
+    def percentual_ocupado(self) -> int:
+        return min(100, round(100 * self.vagas_ocupadas / self.vagas)) if self.vagas else 100
+
     @property
     def vagas_ocupadas(self) -> int:
         return self.alocacoes.count()
@@ -145,11 +164,16 @@ class Turno(SoftDeleteModel):
 
 
 class Alocacao(SoftDeleteModel):
-    """Voluntario alocado em um turno."""
+    """Um voluntário ou usuário responsável por um turno."""
 
     turno = models.ForeignKey(Turno, on_delete=models.CASCADE, related_name="alocacoes")
     voluntario = models.ForeignKey(
-        "voluntarios.Voluntario", on_delete=models.CASCADE, related_name="alocacoes"
+        "voluntarios.Voluntario", on_delete=models.CASCADE, related_name="alocacoes",
+        null=True, blank=True,
+    )
+    usuario = models.ForeignKey(
+        "accounts.Usuario", on_delete=models.PROTECT, related_name="alocacoes",
+        null=True, blank=True,
     )
     status = models.CharField(
         "situação", max_length=10, choices=StatusAlocacao.choices,
@@ -163,11 +187,25 @@ class Alocacao(SoftDeleteModel):
         constraints = [
             models.UniqueConstraint(
                 fields=["turno", "voluntario"], name="alocacao_unica_por_turno"
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["turno", "usuario"], name="alocacao_usuario_unica_por_turno"
+            ),
+            models.CheckConstraint(
+                condition=(models.Q(voluntario__isnull=False, usuario__isnull=True)
+                           | models.Q(voluntario__isnull=True, usuario__isnull=False)),
+                name="alocacao_exatamente_um_responsavel",
+            ),
         ]
 
     def __str__(self) -> str:
-        return f"{self.voluntario.nome} — {self.turno}"
+        return f"{self.nome_responsavel} — {self.turno}"
+
+    @property
+    def nome_responsavel(self):
+        if self.usuario_id:
+            return self.usuario.get_full_name() or self.usuario.username
+        return self.voluntario.nome if self.voluntario_id else "Sem responsável"
 
     def clean(self):
         """Recusa alocar a mesma pessoa em turnos que se sobrepoem.
@@ -177,12 +215,18 @@ class Alocacao(SoftDeleteModel):
         atravessa escalas diferentes.
         """
         super().clean()
-        if not self.turno_id or not self.voluntario_id:
+        if bool(self.voluntario_id) == bool(self.usuario_id):
+            raise ValidationError("Selecione um usuário ou um voluntário como responsável.")
+        if not self.turno_id:
             return
+
+        pessoa = {"usuario_id": self.usuario_id} if self.usuario_id else {
+            "voluntario_id": self.voluntario_id
+        }
 
         outras = (
             Alocacao.objects.filter(
-                voluntario_id=self.voluntario_id, turno__data=self.turno.data
+                **pessoa, turno__data=self.turno.data
             )
             .exclude(pk=self.pk)
             .select_related("turno")
@@ -191,7 +235,7 @@ class Alocacao(SoftDeleteModel):
         for outra in outras:
             if self.turno.sobrepoe(outra.turno):
                 raise ValidationError(
-                    f"{self.voluntario.nome} já está escalada neste horário: "
+                    f"{self.nome_responsavel} já está escalada neste horário: "
                     f"{outra.turno.hora_inicio:%H:%M}–{outra.turno.hora_fim:%H:%M}, "
                     f"{outra.turno.atividade.nome}."
                 )

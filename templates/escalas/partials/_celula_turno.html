@@ -1,32 +1,7 @@
-<div id="turno-{{ turno.pk }}" class="turno-cell {% if turno.esta_descoberto %}is-descoberto{% endif %}">
-  <div class="turno-cell-atividade">{{ turno.atividade.nome }}</div>
+<div id="turno-{{ turno.pk }}" class="turno-cell {% if turno.esta_descoberto %}is-descoberto{% endif %}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <button type="button" class="turno-cell-abrir" data-turno-detalhe="{% url 'escalas:turno_detalhe' turno.pk %}" aria-haspopup="dialog" aria-label="Ver detalhes de {{ turno.atividade.nome }}, {{ turno.hora_inicio|time:'H:i' }} às {{ turno.hora_fim|time:'H:i' }}">
+    <span class="turno-cell-atividade">{{ turno.atividade.nome }}</span>
+  </button>
 
-  {% for alocacao in turno.alocacoes.all %}
-    <div class="turno-cell-pessoa">
-      <span>{{ alocacao.voluntario.nome }}</span>
-      {% if pode_montar %}
-        <button type="button" class="turno-remover"
-                hx-post="{% url 'escalas:desalocar' alocacao.pk %}"
-                hx-target="#turno-{{ turno.pk }}"
-                hx-swap="outerHTML"
-                hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                aria-label="Remover {{ alocacao.voluntario.nome }} deste turno">&times;</button>
-      {% endif %}
-    </div>
-  {% endfor %}
-
-  {% if turno.esta_descoberto %}
-    <div class="turno-cell-vagas">
-      <i class="bi bi-exclamation-triangle" aria-hidden="true"></i>
-      {{ turno.vagas_ocupadas }}/{{ turno.vagas }}
-    </div>
-    {% if pode_montar %}
-      <button type="button" class="button button-secondary button-small turno-add-vaga"
-              hx-get="{% url 'escalas:disponiveis' turno.pk %}"
-              hx-target="#painel-alocacao"
-              hx-swap="innerHTML">
-        <i class="bi bi-plus-lg" aria-hidden="true"></i> vaga
-      </button>
-    {% endif %}
-  {% endif %}
+  {% for alocacao in turno.alocacoes.all %}<div class="turno-cell-pessoa">{{ alocacao.nome_responsavel }}</div>{% endfor %}
 </div>

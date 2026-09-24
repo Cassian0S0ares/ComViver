@@ -1,0 +1,4 @@
+<div id="agenda-progresso" class="agenda-progresso"{% if oob_progresso %} hx-swap-oob="outerHTML"{% endif %}>
+  <div class="agenda-progresso-texto"><strong>{{ agenda_feitos }} de {{ agenda|length }}</strong> <span class="muted small">feito{{ agenda|length|pluralize }}</span>{% if agenda_feitos == agenda|length %} <span class="agenda-tudo-feito"><i class="bi bi-stars" aria-hidden="true"></i> Tudo feito</span>{% endif %}</div>
+  <progress max="{{ agenda|length }}" value="{{ agenda_feitos }}" aria-label="{{ agenda_feitos }} de {{ agenda|length }} turnos feitos">{{ agenda_feitos }}/{{ agenda|length }}</progress>
+</div>

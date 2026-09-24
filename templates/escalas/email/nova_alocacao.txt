@@ -1,0 +1,14 @@
+Olá{% if pessoa.first_name %}, {{ pessoa.first_name }}{% elif pessoa.nome %}, {{ pessoa.nome }}{% endif %}!
+
+Você entrou na escala de uma atividade do ComViver.
+
+Tipo da atividade: {{ turno.atividade.nome }}
+Data: {{ turno.data|date:"d/m/Y" }}
+Horário: {{ turno.hora_inicio|time:"H:i" }} às {{ turno.hora_fim|time:"H:i" }}
+Quem vai: {% for nome in responsaveis %}{{ nome }}{% if not forloop.last %}, {% endif %}{% endfor %}
+Descrição: {{ turno.atividade.descricao|default:"Não informada." }}
+{% if turno.observacoes %}Observações do turno: {{ turno.observacoes }}
+{% endif %}
+Com carinho,
+Equipe do Lar Padre José Gumercindo
+ComViver

@@ -1,0 +1,14 @@
+{% with turno=item.turno %}<li id="agenda-{{ item.pk }}" class="agenda-item{% if item.feito %} is-feito{% endif %}">
+  <form method="post" action="{% url 'escalas:concluir' item.pk %}" hx-post="{% url 'escalas:concluir' item.pk %}" hx-target="#agenda-{{ item.pk }}" hx-swap="outerHTML" novalidate>
+    {% csrf_token %}
+    <button type="submit" class="agenda-check" role="checkbox" aria-checked="{{ item.feito|yesno:'true,false' }}" aria-label="{{ turno.atividade.nome }}, {{ turno.hora_inicio|time:'H:i' }}: marcar como feito"{% if not item.liberado %} disabled aria-describedby="agenda-{{ item.pk }}-aviso"{% endif %}><i class="bi bi-check-lg" aria-hidden="true"></i></button>
+  </form>
+  <div class="agenda-horario"><strong>{{ turno.hora_inicio|time:'H:i' }}</strong><span>{{ turno.hora_fim|time:'H:i' }}</span></div>
+  <div class="agenda-corpo">
+    <strong class="agenda-atividade">{{ turno.atividade.nome }}</strong>
+    <span class="agenda-meta"><span class="agenda-duracao">{{ turno.duracao }}</span>{% if item.colegas %}<span><i class="bi bi-people" aria-hidden="true"></i> Com {{ item.colegas|join:', ' }}</span>{% else %}<span><i class="bi bi-person" aria-hidden="true"></i> Só você</span>{% endif %}</span>
+    {% if turno.observacoes %}<p class="agenda-observacoes">{{ turno.observacoes }}</p>{% endif %}
+    {% if not item.liberado %}<p id="agenda-{{ item.pk }}-aviso" class="muted small agenda-aviso">Dá para marcar a partir do dia do turno.</p>{% endif %}
+  </div>
+</li>{% endwith %}
+{% if oob_progresso %}{% include 'escalas/partials/_agenda_progresso.html' %}{% endif %}

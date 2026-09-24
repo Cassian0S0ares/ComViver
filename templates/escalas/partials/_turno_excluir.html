@@ -1,0 +1,13 @@
+<div class="turno-modal-confirmacao">
+  <span class="turno-modal-icone is-perigo" aria-hidden="true"><i class="bi bi-trash"></i></span>
+  <h2 id="turno-detalhe-titulo" tabindex="-1">Excluir este turno?</h2>
+  <p id="turno-detalhe-ajuda"><strong>{{ turno.atividade.nome }}</strong><br><span class="muted">{{ turno.data|date:'l, d/m/Y' }} · {{ turno.hora_inicio|time:'H:i' }}–{{ turno.hora_fim|time:'H:i' }}</span></p>
+  {% with total=turno.alocacoes.count %}{% if total %}<p class="notice notice-danger"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> {{ total }} responsáve{{ total|pluralize:'l,is' }} deixará{{ total|pluralize:',ão' }} de estar escalado{{ total|pluralize }} neste horário.</p>{% endif %}{% endwith %}
+</div>
+<form method="post" hx-post="{% url 'escalas:turno_excluir' turno.pk %}" hx-target="#turno-detalhe-conteudo" novalidate>
+  {% csrf_token %}
+  <div class="turno-modal-acoes is-centro">
+    <button type="button" class="button button-secondary" hx-get="{% url 'escalas:turno_detalhe' turno.pk %}" hx-target="#turno-detalhe-conteudo" autofocus>Manter turno</button>
+    <button class="button button-danger" type="submit">Excluir turno</button>
+  </div>
+</form>
