@@ -34,7 +34,7 @@
     <div class="table-scroll">
       <table class="users-table estoque-tabela">
         <caption class="visually-hidden">Itens disponíveis no estoque</caption>
-        <thead><tr><th scope="col">Item</th><th scope="col">Categoria</th><th scope="col" class="estoque-num">Quantidade</th><th scope="col">Validade mais próxima</th><th scope="col"><span class="visually-hidden">Ações</span></th></tr></thead>
+        <thead><tr><th scope="col">Item</th><th scope="col">Categoria</th><th scope="col" class="estoque-num">Quantidade</th><th scope="col"><a class="th-ordenar" href="?{% if filtros_ordenacao %}{{ filtros_ordenacao }}&amp;{% endif %}ordenar_validade={% if ordenar_validade == 'asc' %}desc{% else %}asc{% endif %}" data-sort-link aria-label="Ordenar por validade mais próxima, {% if ordenar_validade == 'asc' %}das que demoram mais para vencer{% else %}das que vencem primeiro{% endif %}">Validade mais próxima <i class="bi {% if ordenar_validade == 'asc' %}bi-chevron-up{% elif ordenar_validade == 'desc' %}bi-chevron-down{% else %}bi-chevron-expand{% endif %}" aria-hidden="true"></i></a></th><th scope="col"><span class="visually-hidden">Ações</span></th></tr></thead>
         <tbody>
           {% for item in itens %}
           <tr>

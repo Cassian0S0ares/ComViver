@@ -2,7 +2,7 @@ from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.db.models import Min, Q, Sum
+from django.db.models import F, Min, Q, Sum
 from django.utils import timezone
 
 from estoque.models import ItemEstoque, LoteEstoque, MovimentacaoEstoque, TipoMovimentacao
@@ -17,8 +17,12 @@ def item_por_nome(categoria, nome: str) -> ItemEstoque:
     return item or ItemEstoque.objects.create(categoria=categoria, nome=nome)
 
 
-def itens_disponiveis(busca: str = "", categoria=None):
-    """Itens com saldo, com a quantidade total e a validade mais proxima."""
+def itens_disponiveis(busca: str = "", categoria=None, ordenar_validade: str = ""):
+    """Itens com saldo, com a quantidade total e a validade mais proxima.
+
+    `ordenar_validade` em "asc" poe quem vence primeiro no topo; "desc" poe
+    quem vence por ultimo. Quem nao tem validade fica sempre por ultimo.
+    """
     com_saldo = Q(lotes__saldo__gt=0)
     qs = (
         ItemEstoque.objects.select_related("categoria")
@@ -32,6 +36,10 @@ def itens_disponiveis(busca: str = "", categoria=None):
         qs = qs.filter(nome__icontains=busca.strip())
     if categoria:
         qs = qs.filter(categoria=categoria)
+    if ordenar_validade == "asc":
+        return qs.order_by(F("proxima_validade").asc(nulls_last=True), "categoria__nome", "nome")
+    if ordenar_validade == "desc":
+        return qs.order_by(F("proxima_validade").desc(nulls_last=True), "categoria__nome", "nome")
     return qs.order_by("categoria__nome", "nome")
 
 

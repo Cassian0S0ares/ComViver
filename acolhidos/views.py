@@ -392,7 +392,10 @@ class _MedicacaoMixin:
         return super().get_form_kwargs() | {"acolhido": self.acolhido}
 
     def get_context_data(self, **kwargs):
-        return super().get_context_data(**kwargs) | {"acolhido": self.acolhido}
+        return super().get_context_data(**kwargs) | {
+            "acolhido": self.acolhido,
+            "medicamentos_registrados": MedicacaoForm.medicamentos_registrados(),
+        }
 
     def form_valid(self, form):
         resposta = super().form_valid(form)

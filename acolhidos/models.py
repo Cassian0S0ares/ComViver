@@ -1,5 +1,6 @@
 from datetime import date
 
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from simple_history.models import HistoricalRecords
 
@@ -239,11 +240,12 @@ class Medicacao(SoftDeleteModel):
 
     acolhido = models.ForeignKey(Acolhido, on_delete=models.CASCADE, related_name="medicacoes")
     nome = models.CharField("medicamento", max_length=120)
-    dosagem = models.CharField("dosagem", max_length=60)
-    frequencia = models.CharField("frequência", max_length=80, help_text="Ex.: 8h e 20h")
+    # Horas cheias do dia em que o plantao administra. A dose e o jeito de dar
+    # ("1 gota, apos o cafe") ficam nas observacoes.
+    horarios = ArrayField(models.TimeField(), verbose_name="horários", default=list)
     inicio = models.DateField("início")
     fim = models.DateField("fim", null=True, blank=True, help_text="Vazio = uso contínuo")
-    observacoes = models.TextField("observações", blank=True)
+    observacoes = models.CharField("observações", max_length=200, blank=True)
 
     # `objects` continua sendo o manager de exclusao logica herdado, e
     # `em_vigor` tambem ignora os excluidos: remedio suspenso e apagado nao
@@ -260,7 +262,11 @@ class Medicacao(SoftDeleteModel):
         default_manager_name = "objects"
 
     def __str__(self) -> str:
-        return f"{self.nome} {self.dosagem}"
+        return self.nome
+
+    @property
+    def horarios_rotulo(self) -> str:
+        return " · ".join(f"{h:%H:%M}" for h in sorted(self.horarios)) or "—"
 
 
 class Turno(models.TextChoices):

@@ -173,6 +173,24 @@ def test_painel_mostra_alimentos_perto_da_validade(client, alimentos, usuario_op
     assert "Feijão" not in html
 
 
+def test_tipo_da_doacao_lista_dinheiro_categorias_e_servico(client, alimentos, usuario_operacional):
+    client.force_login(usuario_operacional)
+    html = client.get(reverse("doacoes:nova")).content.decode()
+    assert '<optgroup label="Itens para o estoque">' in html
+    assert f'value="c{alimentos.pk}" data-categoria="{alimentos.pk}" data-validade="1"' in html
+    assert 'value="DINHEIRO"' in html and 'value="SERVICO"' in html
+    assert html.index('value="SERVICO"') < html.index('<optgroup label="Itens para o estoque">')
+    assert 'name="categoria_estoque"' not in html
+
+
+def test_lista_de_doacoes_filtra_por_categoria(client, alimentos, limpeza, usuario_operacional):
+    client.force_login(usuario_operacional)
+    client.post(reverse("doacoes:nova"), _doacao(alimentos, item_nome="Arroz"))
+    client.post(reverse("doacoes:nova"), _doacao(limpeza, item_nome="Sabão"))
+    html = client.get(reverse("doacoes:lista"), {"tipo": f"c{limpeza.pk}"}).content.decode()
+    assert "Sabão" in html and "Arroz" not in html
+
+
 def test_menu_tem_estoque(client, usuario_operacional):
     client.force_login(usuario_operacional)
     assert reverse("estoque:lista") in client.get(reverse("core:painel")).content.decode()
@@ -180,8 +198,9 @@ def test_menu_tem_estoque(client, usuario_operacional):
 
 # ------------------------------------------------------------------ doacao
 
-def _doacao(**extra):
-    return {"doador": DoadorFactory().pk, "tipo": TipoDoacao.ALIMENTO, "quantidade": 12,
+def _doacao(categoria=None, **extra):
+    tipo = f"c{categoria.pk}" if categoria else TipoDoacao.SERVICO
+    return {"doador": DoadorFactory().pk, "tipo": tipo, "quantidade": 12,
             "data_recebimento": HOJE().isoformat()} | extra
 
 
@@ -189,29 +208,28 @@ def test_doacao_de_item_entra_no_estoque(client, alimentos, usuario_operacional)
     client.force_login(usuario_operacional)
     validade = (HOJE() + timedelta(days=10)).isoformat()
     resposta = client.post(reverse("doacoes:nova"), _doacao(
-        categoria_estoque=alimentos.pk, item_nome="Arroz 5kg", validade=validade,
-        unidade="horas",
+        alimentos, item_nome="Arroz 5kg", validade=validade, unidade="horas",
     ))
     assert resposta.status_code == 302
     doacao = Doacao.objects.get()
+    assert (doacao.tipo, doacao.categoria) == (TipoDoacao.ITEM, alimentos)
+    assert doacao.tipo_rotulo == "Alimentos"
     assert (doacao.unidade, doacao.descricao) == ("unidades", "Arroz 5kg")
     lote = doacao.lote_estoque
     assert (lote.item.nome, lote.saldo, lote.validade.isoformat()) == ("Arroz 5kg", 12, validade)
 
 
-def test_doacao_de_item_exige_categoria_e_item(client, usuario_operacional):
+def test_doacao_de_item_exige_o_item(client, alimentos, usuario_operacional):
     client.force_login(usuario_operacional)
-    resposta = client.post(reverse("doacoes:nova"), _doacao())
-    erros = resposta.context["form"].errors
-    assert "categoria_estoque" in erros and "item_nome" in erros
+    resposta = client.post(reverse("doacoes:nova"), _doacao(alimentos))
+    assert "item_nome" in resposta.context["form"].errors
     assert not Doacao.objects.exists()
 
 
 def test_doacao_em_dinheiro_e_servico_nao_vao_para_o_estoque(client, alimentos, usuario_operacional):
     client.force_login(usuario_operacional)
     client.post(reverse("doacoes:nova"), _doacao(
-        tipo=TipoDoacao.SERVICO, descricao="Corte de cabelo", quantidade=3, unidade="horas",
-        categoria_estoque=alimentos.pk, item_nome="Arroz",
+        descricao="Corte de cabelo", quantidade=3, unidade="horas", item_nome="Arroz",
     ))
     doacao = Doacao.objects.get()
     assert doacao.unidade == "horas"
@@ -220,11 +238,11 @@ def test_doacao_em_dinheiro_e_servico_nao_vao_para_o_estoque(client, alimentos, 
 
 def test_editar_doacao_ajusta_o_lote(client, alimentos, usuario_operacional):
     client.force_login(usuario_operacional)
-    client.post(reverse("doacoes:nova"), _doacao(categoria_estoque=alimentos.pk, item_nome="Arroz"))
+    client.post(reverse("doacoes:nova"), _doacao(alimentos, item_nome="Arroz"))
     doacao = Doacao.objects.get()
     dar_baixa(doacao.lote_estoque.item, 5, usuario_operacional)
     url = reverse("doacoes:editar", args=[doacao.pk])
-    dados = _doacao(doador=doacao.doador_id, categoria_estoque=alimentos.pk, item_nome="Arroz")
+    dados = _doacao(alimentos, doador=doacao.doador_id, item_nome="Arroz")
     resposta = client.post(url, dados | {"quantidade": 4})
     assert "Já saíram 5 unidades" in resposta.content.decode()
     resposta = client.post(url, dados | {"quantidade": 20})

@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 import pytest
 from django.urls import reverse
@@ -16,9 +16,9 @@ URL = "/medicacoes/"
 def remedios():
     ana = AcolhidoFactory(nome="Ana Clara Souza")
     bruno = AcolhidoFactory(nome="Bruno Lima")
-    MedicacaoFactory(acolhido=ana, nome="Vitamina D", dosagem="1 gota", frequencia="Manhã")
-    MedicacaoFactory(acolhido=bruno, nome="Vitamina D", dosagem="2 gotas", frequencia="Manhã")
-    MedicacaoFactory(acolhido=ana, nome="Dipirona", frequencia="8h e 20h")
+    MedicacaoFactory(acolhido=ana, nome="Vitamina D", observacoes="1 gota", horarios=[time(8)])
+    MedicacaoFactory(acolhido=bruno, nome="Vitamina D", observacoes="2 gotas", horarios=[time(8)])
+    MedicacaoFactory(acolhido=ana, nome="Dipirona", horarios=[time(8), time(20)])
     MedicacaoFactory(
         acolhido=bruno,
         nome="Amoxicilina",
@@ -139,8 +139,8 @@ class TestResumo:
 
     def test_mesma_crianca_com_o_mesmo_remedio_conta_uma_vez(self, client, usuario_operacional):
         acolhido = AcolhidoFactory()
-        MedicacaoFactory(acolhido=acolhido, nome="Vitamina D", frequencia="Manhã")
-        MedicacaoFactory(acolhido=acolhido, nome="Vitamina D", frequencia="Noite")
+        MedicacaoFactory(acolhido=acolhido, nome="Vitamina D", horarios=[time(8)])
+        MedicacaoFactory(acolhido=acolhido, nome="Vitamina D", horarios=[time(20)])
         client.force_login(usuario_operacional)
         resumo = client.get(reverse("acolhidos:medicacoes")).context["resumo"]
         assert resumo[0]["criancas"] == 1

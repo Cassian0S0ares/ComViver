@@ -13,7 +13,8 @@ if (goalForm) {
     const unit = row.querySelector('select[name$="-unidade"]');
     if (!type || !unit) return;
     for (const option of unit.options) {
-      const allowed = !option.value || option.dataset.tipos?.split(' ').includes(type.value);
+      const base = /^c\d+$/.test(type.value) ? 'ITEM' : type.value;
+      const allowed = !option.value || option.dataset.tipos?.split(' ').includes(base);
       option.hidden = !allowed;
       option.disabled = !allowed;
     }

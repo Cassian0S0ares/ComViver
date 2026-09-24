@@ -16,8 +16,10 @@ from accounts.models import Perfil
 from core.mixins import PerfilRequiredMixin
 from core.pdf import renderizar_pdf
 from core.views import BaseCreateView, BaseListView, BaseUpdateView
-from doacoes.forms import CampanhaForm, DoacaoForm, DoadorForm, MetasItemFormSet
-from doacoes.models import Campanha, Doacao, Doador, TipoDoacao
+from doacoes.forms import (
+    PREFIXO_CATEGORIA, CampanhaForm, DoacaoForm, DoadorForm, MetasItemFormSet,
+)
+from doacoes.models import Campanha, Doacao, Doador, TipoDoacao, rotulo_do_tipo
 
 TODOS_OS_PERFIS = [Perfil.ADMIN, Perfil.TECNICO, Perfil.OPERACIONAL]
 QUEM_REGISTRA = [Perfil.ADMIN, Perfil.OPERACIONAL]
@@ -62,9 +64,13 @@ class DoacaoListView(BaseListView):
         return opcoes
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related("doador", "campanha", "recebido_por")
-        tipo = self.request.GET.get("tipo")
-        if tipo:
+        qs = super().get_queryset().select_related(
+            "doador", "campanha", "recebido_por", "categoria"
+        )
+        tipo = self.request.GET.get("tipo", "")
+        if tipo.startswith(PREFIXO_CATEGORIA) and tipo[1:].isdecimal():
+            qs = qs.filter(tipo=TipoDoacao.ITEM, categoria_id=tipo[1:])
+        elif tipo:
             qs = qs.filter(tipo=tipo)
         mes = self._mes_filtrado()
         if mes:
@@ -89,7 +95,13 @@ class DoacaoListView(BaseListView):
         contexto["mes_filtrado"] = self._mes_filtrado()
         contexto["meses_disponiveis"] = self._meses_disponiveis(contexto["mes_filtrado"])
         contexto["totais"] = totais_por_tipo(self.get_queryset())
-        contexto["form_tipos"] = TipoDoacao.choices
+        from estoque.models import CategoriaItem
+
+        contexto["form_tipos"] = [
+            (TipoDoacao.DINHEIRO, TipoDoacao.DINHEIRO.label),
+            (TipoDoacao.SERVICO, TipoDoacao.SERVICO.label),
+            *[(f"{PREFIXO_CATEGORIA}{c.pk}", c.nome) for c in CategoriaItem.objects.all()],
+        ]
         return contexto
 
 
@@ -271,18 +283,17 @@ class CampanhaDetailView(PerfilRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         contexto = super().get_context_data(**kwargs)
-        doacoes = self.object.doacoes.select_related("doador", "recebido_por")
+        doacoes = self.object.doacoes.select_related("doador", "recebido_por", "categoria")
         pagina = Paginator(doacoes, 25).get_page(self.request.GET.get("page"))
         itens = list(
             Doacao.objects.filter(campanha=self.object)
             .exclude(tipo=TipoDoacao.DINHEIRO)
-            .values("tipo", "descricao", "unidade")
+            .values("tipo", "categoria__nome", "descricao", "unidade")
             .annotate(quantidade_total=Sum("quantidade"), registros=Count("pk"))
-            .order_by("tipo", "descricao", "unidade")
+            .order_by("tipo", "categoria__nome", "descricao", "unidade")
         )
-        tipos = dict(TipoDoacao.choices)
         for item in itens:
-            item["tipo_display"] = tipos[item["tipo"]]
+            item["tipo_display"] = item["categoria__nome"] or rotulo_do_tipo(item["tipo"], None)
         contexto.update(
             doacoes=pagina.object_list,
             page_obj=pagina,

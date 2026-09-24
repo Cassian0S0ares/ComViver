@@ -18,12 +18,12 @@ class TestTotaisPorTipo:
     def test_agrupa_e_conta(self):
         DoacaoFactory(tipo=TipoDoacao.DINHEIRO, valor=Decimal("100.00"))
         DoacaoFactory(tipo=TipoDoacao.DINHEIRO, valor=Decimal("50.00"))
-        DoacaoFactory(tipo=TipoDoacao.ALIMENTO, valor=None, descricao="Arroz")
+        DoacaoFactory(tipo=TipoDoacao.ITEM, valor=None, descricao="Arroz")
         resultado = {linha["tipo"]: linha for linha in totais_por_tipo()}
         assert resultado["DINHEIRO"]["quantidade"] == 2
         assert resultado["DINHEIRO"]["soma"] == Decimal("150.00")
-        assert resultado["ALIMENTO"]["quantidade"] == 1
-        assert resultado["ALIMENTO"]["soma"] == Decimal("0")
+        assert resultado["ITEM"]["quantidade"] == 1
+        assert resultado["ITEM"]["soma"] == Decimal("0")
 
     def test_respeita_a_consulta_recebida(self):
         DoacaoFactory(tipo=TipoDoacao.DINHEIRO, valor=Decimal("100.00"))
@@ -47,7 +47,7 @@ class TestTotaisPorTipo:
 class TestTotalArrecadado:
     def test_soma_apenas_dinheiro(self):
         DoacaoFactory(tipo=TipoDoacao.DINHEIRO, valor=Decimal("100.00"))
-        DoacaoFactory(tipo=TipoDoacao.ALIMENTO, valor=None, descricao="Arroz")
+        DoacaoFactory(tipo=TipoDoacao.ITEM, valor=None, descricao="Arroz")
         assert total_arrecadado() == Decimal("100.00")
 
     def test_zero_sem_doacao(self):

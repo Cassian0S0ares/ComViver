@@ -6,7 +6,6 @@ from django.forms import BaseInlineFormSet, inlineformset_factory
 from accounts.forms import FormularioAcessivelMixin
 from accounts.models import Perfil
 from doacoes.models import (
-    TIPOS_DE_ITEM,
     UNIDADES_DOACAO,
     UNIDADES_POR_TIPO,
     Campanha,
@@ -37,6 +36,60 @@ class UnidadePorTipoSelect(forms.Select):
         return opcao
 
 
+PREFIXO_CATEGORIA = "c"
+
+
+class TipoSelect(forms.Select):
+    """As opcoes de categoria levam o id e se a categoria tem validade, para a
+    tela mostrar os campos do estoque certos."""
+
+    categorias: dict = {}
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        opcao = super().create_option(name, value, label, selected, index, subindex, attrs)
+        valor = str(value)
+        if valor.startswith(PREFIXO_CATEGORIA) and valor[1:].isdecimal():
+            categoria = self.categorias.get(int(valor[1:]))
+            opcao["attrs"]["data-categoria"] = valor[1:]
+            opcao["attrs"]["data-validade"] = "1" if categoria and categoria.tem_validade else "0"
+        return opcao
+
+
+def campo_tipo(com_dinheiro=True) -> forms.ChoiceField:
+    """Um select so: Dinheiro, Servico e, por ultimo, as categorias do estoque.
+
+    Escolher uma categoria significa "itens", que vao para o estoque.
+    """
+    from estoque.models import CategoriaItem
+
+    categorias = {c.pk: c for c in CategoriaItem.objects.all()}
+    opcoes = [("", "Selecione o tipo")]
+    if com_dinheiro:
+        opcoes.append((TipoDoacao.DINHEIRO, TipoDoacao.DINHEIRO.label))
+    opcoes.append((TipoDoacao.SERVICO, TipoDoacao.SERVICO.label))
+    opcoes.append(("Itens para o estoque", [
+        (f"{PREFIXO_CATEGORIA}{pk}", categoria.nome) for pk, categoria in categorias.items()
+    ]))
+    widget = TipoSelect(attrs={"data-categoria-estoque": ""})
+    widget.categorias = categorias
+    campo = forms.ChoiceField(label="Tipo", choices=opcoes, widget=widget)
+    campo.categorias = categorias
+    return campo
+
+
+def valor_do_tipo(tipo, categoria_id) -> str:
+    if tipo == TipoDoacao.ITEM and categoria_id:
+        return f"{PREFIXO_CATEGORIA}{categoria_id}"
+    return tipo or ""
+
+
+def ler_tipo(campo, valor):
+    """'c5' vira (ITEM, categoria 5); 'DINHEIRO' e 'SERVICO' ficam sem categoria."""
+    if valor and valor.startswith(PREFIXO_CATEGORIA):
+        return TipoDoacao.ITEM, campo.categorias.get(int(valor[1:]))
+    return valor, None
+
+
 class FormularioDoacoesMixin(FormularioAcessivelMixin):
     perfis_permitidos = (Perfil.ADMIN, Perfil.OPERACIONAL)
 
@@ -64,10 +117,10 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
 
     class Meta:
         model = Doacao
+        # "tipo" e montado a mao: junta o tipo e a categoria do estoque num campo so.
         fields = [
             "doador",
             "campanha",
-            "tipo",
             "descricao",
             "quantidade",
             "unidade",
@@ -85,19 +138,21 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
 
         super().__init__(*args, usuario=usuario, **kwargs)
         self.usuario = usuario
-        # Item doado vai direto para o estoque: categoria, item e validade.
+        self.fields["tipo"] = campo_tipo()
+        # Item doado vai direto para o estoque: item e validade.
         campos = campos_de_item(obrigatorios=False)
-        self.fields["categoria_estoque"] = campos["categoria"]
-        self.fields["categoria_estoque"].label = "Categoria no estoque"
         self.fields["item_nome"] = campos["item_nome"]
         self.fields["validade"] = campos["validade"]
-        lote = getattr(self.instance, "lote_estoque", None) if self.instance.pk else None
-        if lote:
-            self.initial.setdefault("categoria_estoque", lote.item.categoria_id)
-            self.initial.setdefault("item_nome", lote.item.nome)
-            self.initial.setdefault("validade", lote.validade)
+        if self.instance.pk:
+            self.initial.setdefault(
+                "tipo", valor_do_tipo(self.instance.tipo, self.instance.categoria_id)
+            )
+            lote = getattr(self.instance, "lote_estoque", None)
+            if lote:
+                self.initial.setdefault("item_nome", lote.item.nome)
+                self.initial.setdefault("validade", lote.validade)
         self.order_fields([
-            "doador", "campanha", "tipo", "categoria_estoque", "item_nome", "descricao",
+            "doador", "campanha", "tipo", "item_nome", "descricao",
             "quantidade", "unidade", "validade", "valor", "data_recebimento", "observacoes",
         ])
         self.fields["descricao"].help_text = (
@@ -133,10 +188,11 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
 
     def clean(self):
         dados = super().clean()
+        tipo, categoria = ler_tipo(self.fields["tipo"], dados.get("tipo"))
+        self.instance.tipo, self.instance.categoria = tipo or "", categoria
         # Doacao em dinheiro nao tem quantidade nem unidade: a tela esconde os
         # dois campos, e aqui o valor enviado por engano — ou por POST forjado —
         # e descartado, para nao gravar "20 pacotes de dinheiro".
-        tipo = dados.get("tipo")
         if tipo == TipoDoacao.DINHEIRO:
             dados["quantidade"] = None
             dados["unidade"] = ""
@@ -145,22 +201,21 @@ class DoacaoForm(FormularioDoacoesMixin, forms.ModelForm):
         else:
             dados["valor"] = None
             self.instance.valor = None
-        self._limpar_estoque(dados, tipo)
+        self._limpar_estoque(dados, tipo, categoria)
         return dados
 
-    def _limpar_estoque(self, dados, tipo):
+    def _limpar_estoque(self, dados, tipo, categoria):
         from estoque.forms import item_existente, limpar_item
         from estoque.services import conferir_edicao_da_doacao
 
         self.item_estoque = None
-        if tipo not in TIPOS_DE_ITEM:
-            dados.update(categoria_estoque=None, item_nome="", validade=None)
+        if tipo != TipoDoacao.ITEM:
+            dados.update(item_nome="", validade=None)
         else:
             # Item e sempre contado em unidades, para o estoque conseguir somar.
             dados["unidade"] = self.instance.unidade = "unidades"
-            categoria, nome = limpar_item(self, dados, "categoria_estoque")
-            if not categoria:
-                self.add_error("categoria_estoque", "Selecione a categoria do item no estoque.")
+            dados["categoria_do_tipo"] = categoria
+            _, nome = limpar_item(self, dados, "categoria_do_tipo")
             if not nome:
                 self.add_error("item_nome", "Informe o item doado.")
             if nome and not (dados.get("descricao") or "").strip():
@@ -257,12 +312,25 @@ class MetaItemCampanhaForm(forms.ModelForm):
 
     class Meta:
         model = MetaItemCampanha
-        fields = ["tipo", "quantidade", "unidade"]
+        fields = ["quantidade", "unidade"]
         widgets = {"unidade": UnidadePorTipoSelect}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["tipo"] = campo_tipo(com_dinheiro=False)
+        self.fields["tipo"].label = "Tipo de item"
+        if self.instance.pk:
+            self.initial.setdefault(
+                "tipo", valor_do_tipo(self.instance.tipo, self.instance.categoria_id)
+            )
+        self.order_fields(["tipo", "quantidade", "unidade"])
         _aplicar_classes(self.fields)
+
+    def clean(self):
+        dados = super().clean()
+        tipo, categoria = ler_tipo(self.fields["tipo"], dados.get("tipo"))
+        self.instance.tipo, self.instance.categoria = tipo or "", categoria
+        return dados
 
 
 class BaseMetasItemFormSet(BaseInlineFormSet):

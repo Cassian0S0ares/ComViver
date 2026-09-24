@@ -1,3 +1,5 @@
+const tipoBase = valor => (/^c\d+$/.test(valor) ? 'ITEM' : valor);
+
 function atualizarUnidades(container) {
   if (!container) return;
   const tipo = container.querySelector('select[name="tipo"], select[name$="-tipo"]');
@@ -6,7 +8,7 @@ function atualizarUnidades(container) {
 
   for (const opcao of unidade.options) {
     if (!opcao.value) continue;
-    const permitida = (opcao.dataset.tipos || '').split(' ').includes(tipo.value);
+    const permitida = (opcao.dataset.tipos || '').split(' ').includes(tipoBase(tipo.value));
     opcao.disabled = !permitida;
     opcao.hidden = !permitida;
   }

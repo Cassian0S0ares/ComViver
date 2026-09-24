@@ -17,12 +17,12 @@ class TipoPessoa(models.TextChoices):
 
 
 class TipoDoacao(models.TextChoices):
+    """O que chegou. Em ITEM, a categoria do estoque diz o que e (Alimentos,
+    Limpeza...) e a doacao entra no estoque; dinheiro e servico ficam fora."""
+
     DINHEIRO = "DINHEIRO", "Dinheiro"
-    ALIMENTO = "ALIMENTO", "Alimento"
-    VESTUARIO = "VESTUARIO", "Vestuário"
-    MATERIAL = "MATERIAL", "Material"
+    ITEM = "ITEM", "Itens"
     SERVICO = "SERVICO", "Serviço"
-    OUTRO = "OUTRO", "Outro"
 
 
 # Itens contam so em unidades: e o que o estoque consegue somar e dar baixa.
@@ -32,12 +32,17 @@ UNIDADES_DOACAO = [
     ("horas", "Hora"),
 ]
 
-TIPOS_DE_ITEM = (TipoDoacao.ALIMENTO, TipoDoacao.VESTUARIO, TipoDoacao.MATERIAL, TipoDoacao.OUTRO)
-
 UNIDADES_POR_TIPO = {
-    **{tipo: ("unidades",) for tipo in TIPOS_DE_ITEM},
+    TipoDoacao.ITEM: ("unidades",),
     TipoDoacao.SERVICO: ("unidades", "horas"),
 }
+
+
+def rotulo_do_tipo(tipo, categoria) -> str:
+    """'Alimentos' para itens, 'Dinheiro' ou 'Serviço' para o resto."""
+    if tipo == TipoDoacao.ITEM and categoria is not None:
+        return categoria.nome
+    return TipoDoacao(tipo).label if tipo in TipoDoacao.values else tipo
 
 
 class Doador(SoftDeleteModel, Endereco):
@@ -170,19 +175,19 @@ class Campanha(SoftDeleteModel):
                 }
             )
         totais = {
-            (linha["tipo"], linha["unidade"]): linha["total"] or 0
+            (linha["tipo"], linha["categoria"], linha["unidade"]): linha["total"] or 0
             for linha in self.doacoes.filter(deleted_at__isnull=True)
             .exclude(tipo=TipoDoacao.DINHEIRO)
-            .values("tipo", "unidade")
+            .values("tipo", "categoria", "unidade")
             .annotate(total=Sum("quantidade"))
         }
-        for meta in self.metas_itens.all():
-            recebido = totais.get((meta.tipo, meta.unidade), 0)
+        for meta in self.metas_itens.select_related("categoria"):
+            recebido = totais.get((meta.tipo, meta.categoria_id, meta.unidade), 0)
             percentual = int(recebido / meta.quantidade * 100)
             metas.append(
                 {
                     "tipo": meta.tipo,
-                    "rotulo": meta.get_tipo_display(),
+                    "rotulo": meta.rotulo,
                     "alvo": meta.quantidade,
                     "recebido": recebido,
                     "unidade": meta.unidade,
@@ -210,6 +215,10 @@ class MetaItemCampanha(models.Model):
         max_length=10,
         choices=[opcao for opcao in TipoDoacao.choices if opcao[0] != TipoDoacao.DINHEIRO],
     )
+    categoria = models.ForeignKey(
+        "estoque.CategoriaItem", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="metas_campanha", verbose_name="categoria",
+    )
     quantidade = models.PositiveIntegerField("quantidade desejada")
     unidade = models.CharField("unidade", max_length=30, choices=UNIDADES_DOACAO)
 
@@ -219,17 +228,24 @@ class MetaItemCampanha(models.Model):
         ordering = ["pk"]
         constraints = [
             models.UniqueConstraint(
-                fields=["campanha", "tipo", "unidade"], name="meta_item_campanha_unica"
+                fields=["campanha", "tipo", "categoria", "unidade"],
+                name="meta_item_campanha_unica",
             )
         ]
 
     def __str__(self) -> str:
-        return f"{self.quantidade} {self.unidade} de {self.get_tipo_display()}"
+        return f"{self.quantidade} {self.unidade} de {self.rotulo}"
+
+    @property
+    def rotulo(self) -> str:
+        return rotulo_do_tipo(self.tipo, self.categoria)
 
     def clean(self):
         super().clean()
         if self.quantidade is not None and self.quantidade < 1:
             raise ValidationError({"quantidade": "A quantidade precisa ser maior que zero."})
+        if self.tipo == TipoDoacao.ITEM and not self.categoria_id:
+            raise ValidationError({"tipo": "Escolha a categoria do item."})
 
         if self.tipo and self.unidade and self.unidade not in UNIDADES_POR_TIPO.get(self.tipo, ()):
             raise ValidationError(
@@ -257,6 +273,10 @@ class Doacao(SoftDeleteModel):
         Campanha, null=True, blank=True, on_delete=models.SET_NULL, related_name="doacoes"
     )
     tipo = models.CharField("tipo", max_length=10, choices=TipoDoacao.choices)
+    categoria = models.ForeignKey(
+        "estoque.CategoriaItem", null=True, blank=True, on_delete=models.PROTECT,
+        related_name="doacoes", verbose_name="categoria no estoque",
+    )
     descricao = models.CharField(
         "descrição", max_length=200, blank=True, help_text="Ex.: Arroz 5kg, cobertores"
     )
@@ -290,7 +310,11 @@ class Doacao(SoftDeleteModel):
 
     def __str__(self) -> str:
         quem = self.doador.nome if self.doador else "Anônimo"
-        return f"{self.get_tipo_display()} — {quem} ({self.data_recebimento:%d/%m/%Y})"
+        return f"{self.tipo_rotulo} — {quem} ({self.data_recebimento:%d/%m/%Y})"
+
+    @property
+    def tipo_rotulo(self) -> str:
+        return rotulo_do_tipo(self.tipo, self.categoria)
 
     def clean(self):
         super().clean()
@@ -302,6 +326,8 @@ class Doacao(SoftDeleteModel):
             elif self.valor <= 0:
                 erros["valor"] = "O valor precisa ser maior que zero."
         elif self.tipo:
+            if self.tipo == TipoDoacao.ITEM and not self.categoria_id:
+                erros["tipo"] = "Escolha a categoria do item no estoque."
             if not self.descricao.strip():
                 erros["descricao"] = "Descreva o que foi doado."
             if self.quantidade is None:

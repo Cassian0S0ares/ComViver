@@ -15,11 +15,10 @@ def _dados(**extra):
     base = {
         "doador": "",
         "campanha": "",
-        "tipo": TipoDoacao.ALIMENTO,
+        "tipo": f"c{CategoriaItem.objects.get_or_create(nome='Alimentos')[0].pk}",
         "descricao": "Arroz 5kg",
         "quantidade": "20",
         "unidade": "unidades",
-        "categoria_estoque": CategoriaItem.objects.get_or_create(nome="Alimentos")[0].pk,
         "item_nome": "Arroz 5kg",
         "valor": "",
         "data_recebimento": date.today().isoformat(),

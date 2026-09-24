@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, time
 
 import factory
 
@@ -69,7 +69,7 @@ class MedicacaoFactory(factory.django.DjangoModelFactory):
 
     acolhido = factory.SubFactory(AcolhidoFactory)
     nome = "Dipirona"
-    dosagem = "500mg"
-    frequencia = "8h e 20h"
+    horarios = factory.LazyFunction(lambda: [time(8), time(20)])
+    observacoes = "500mg"
     inicio = factory.LazyFunction(date.today)
     fim = None

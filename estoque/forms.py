@@ -14,6 +14,7 @@ class CategoriaSelect(forms.Select):
         opcao = super().create_option(name, value, label, selected, index, subindex, attrs)
         instancia = getattr(value, "instance", None)
         if instancia is not None:
+            opcao["attrs"]["data-categoria"] = str(instancia.pk)
             opcao["attrs"]["data-validade"] = "1" if instancia.tem_validade else "0"
         return opcao
 

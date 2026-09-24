@@ -26,7 +26,8 @@ def _dados(**extra):
 
 
 def _item():
-    return {"categoria_estoque": CategoriaItem.objects.get_or_create(nome="Alimentos")[0].pk, "item_nome": "Arroz"}
+    return {"tipo": f"c{CategoriaItem.objects.get_or_create(nome='Alimentos')[0].pk}",
+            "item_nome": "Arroz"}
 
 
 class TestDinheiroSemQuantidade:
@@ -42,7 +43,7 @@ class TestDinheiroSemQuantidade:
 
     def test_editar_para_dinheiro_limpa_o_que_ja_existia(self, client, usuario_operacional):
         doacao = DoacaoFactory(
-            tipo=TipoDoacao.ALIMENTO, descricao="Arroz", quantidade=20, unidade="unidades"
+            tipo=TipoDoacao.ITEM, descricao="Arroz", quantidade=20, unidade="unidades"
         )
         client.force_login(usuario_operacional)
         client.post(reverse("doacoes:editar", args=[doacao.pk]), _dados())
@@ -56,7 +57,6 @@ class TestDinheiroSemQuantidade:
         client.post(
             reverse("doacoes:nova"),
             _dados(
-                tipo=TipoDoacao.ALIMENTO,
                 descricao="Arroz 5kg",
                 quantidade="20",
                 unidade="unidades",
@@ -80,7 +80,6 @@ class TestDinheiroSemQuantidade:
         resposta = client.post(
             reverse("doacoes:editar", args=[doacao.pk]),
             _dados(
-                tipo=TipoDoacao.ALIMENTO,
                 descricao="Arroz",
                 quantidade="1",
                 unidade="unidades",
@@ -90,7 +89,7 @@ class TestDinheiroSemQuantidade:
         )
         assert resposta.status_code == 302
         doacao.refresh_from_db()
-        assert doacao.tipo == TipoDoacao.ALIMENTO
+        assert doacao.tipo == TipoDoacao.ITEM
         assert doacao.valor is None
 
 class TestCamposEscondidos:

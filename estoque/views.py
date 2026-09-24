@@ -45,17 +45,26 @@ class EstoqueListView(BaseListView):
         valor = self.request.GET.get("categoria", "")
         return CategoriaItem.objects.filter(pk=valor).first() if valor.isdecimal() else None
 
+    def _ordenar_validade(self):
+        valor = self.request.GET.get("ordenar_validade", "")
+        return valor if valor in ("asc", "desc") else ""
+
     def get_queryset(self):
-        return itens_disponiveis(self.request.GET.get("q", ""), self._categoria())
+        return itens_disponiveis(self.request.GET.get("q", ""), self._categoria(), self._ordenar_validade())
 
     def get_context_data(self, **kwargs):
         categoria = self._categoria()
+        filtros_ordenacao = self.request.GET.copy()
+        filtros_ordenacao.pop("page", None)
+        filtros_ordenacao.pop("ordenar_validade", None)
         return super().get_context_data(**kwargs) | _contexto_validade() | {
             "categorias": CategoriaItem.objects.all(),
             "categoria_filtrada": categoria.pk if categoria else "",
             "pode_abastecer": _pode_abastecer(self.request.user),
             "baixa_form": BaixaForm(auto_id="baixa_%s"),
             "total_perto_validade": perto_da_validade().count(),
+            "ordenar_validade": self._ordenar_validade(),
+            "filtros_ordenacao": filtros_ordenacao.urlencode(),
         }
 
 

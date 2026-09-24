@@ -36,12 +36,18 @@ def criar_doacoes_demo():
             defaults={"tipo": "PJ" if indice < 2 else "PF", "recorrente": indice % 2 == 0},
         )
         doadores.append(doador)
+    from estoque.models import CategoriaItem
+
+    alimentos, _ = CategoriaItem.objects.get_or_create(
+        nome="Alimentos", defaults={"tem_validade": True}
+    )
     for indice, tipo in enumerate(TipoDoacao.values):
         Doacao.objects.get_or_create(
             observacoes=MARCADOR,
             tipo=tipo,
             campanha=campanha,
             defaults={
+                "categoria": alimentos if tipo == TipoDoacao.ITEM else None,
                 "doador": doadores[indice] if indice < 5 else None,
                 "descricao": f"Contribuição fictícia de {dict(TipoDoacao.choices)[tipo]}",
                 "valor": Decimal("450.00") if tipo == TipoDoacao.DINHEIRO else None,

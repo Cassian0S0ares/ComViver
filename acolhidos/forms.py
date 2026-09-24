@@ -1,6 +1,10 @@
+from datetime import time
+
 from django import forms
 from django.core.validators import MaxLengthValidator
 from django.utils import timezone
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 
 from accounts.forms import FormularioAcessivelMixin
 from acolhidos.models import (
@@ -368,6 +372,45 @@ class VinculoForm(FormularioAcolhidos, forms.ModelForm):
         return vinculo
 
 
+PERIODOS_DO_DIA = [
+    ("Madrugada", range(0, 6)),
+    ("Manhã", range(6, 12)),
+    ("Tarde", range(12, 18)),
+    ("Noite", range(18, 24)),
+]
+
+
+class HorariosWidget(forms.CheckboxSelectMultiple):
+    """As 24 horas do dia em botoes marcaveis, agrupadas por periodo."""
+
+    def format_value(self, value):
+        valores = value if isinstance(value, (list, tuple)) else [value]
+        return [v.strftime("%H:%M") if isinstance(v, time) else str(v)[:5] for v in valores if v]
+
+    def render(self, name, value, attrs=None, renderer=None):
+        marcados = set(self.format_value(value or []))
+        base_id = (attrs or {}).get("id") or f"id_{name}"
+        extras = {k: v for k, v in (attrs or {}).items() if k.startswith("aria-")}
+        grupos = []
+        for periodo, horas in PERIODOS_DO_DIA:
+            botoes = []
+            for hora in horas:
+                valor = f"{hora:02d}:00"
+                botoes.append(format_html(
+                    '<label class="horario-chip"><input type="checkbox" name="{}" value="{}" '
+                    'id="{}_{}"{}{}><span>{}</span></label>',
+                    name, valor, base_id, hora, " checked" if valor in marcados else "",
+                    mark_safe("".join(format_html(' {}="{}"', k, v) for k, v in extras.items())),
+                    valor,
+                ))
+            grupos.append(format_html(
+                '<fieldset class="horarios-periodo"><legend>{}</legend><div class="horarios-chips">{}</div></fieldset>',
+                periodo, mark_safe("".join(botoes)),
+            ))
+        return format_html('<div class="horarios-dia" id="{}" role="group">{}</div>',
+                           base_id, mark_safe("".join(grupos)))
+
+
 class MedicacaoForm(FormularioAcolhidos, forms.ModelForm):
     """Medicamento em uso.
 
@@ -375,16 +418,49 @@ class MedicacaoForm(FormularioAcolhidos, forms.ModelForm):
     significa crianca sem remedio ou remedio a mais.
     """
 
+    horarios = forms.MultipleChoiceField(
+        label="Horários",
+        choices=[(f"{h:02d}:00", f"{h:02d}:00") for h in range(24)],
+        widget=HorariosWidget,
+        help_text="Marque todos os horários em que o remédio é dado.",
+        error_messages={"required": "Marque pelo menos um horário."},
+    )
+
     class Meta:
         model = Medicacao
-        fields = ["nome", "dosagem", "frequencia", "inicio", "fim", "observacoes"]
+        fields = ["nome", "horarios", "inicio", "fim", "observacoes"]
 
     def __init__(self, *args, acolhido=None, usuario=None, **kwargs):
         self.acolhido = acolhido
         self.usuario = usuario
         super().__init__(*args, **kwargs)
+        self.fields["nome"].help_text = (
+            "Digite para buscar nos medicamentos já registrados. Se não existir, escolha Adicionar."
+        )
+        self.fields["nome"].widget.attrs.update({
+            "list": "medicamentos-lista", "autocomplete": "off", "data-combobox": "",
+            "data-combobox-lista": "Medicamentos",
+            "data-combobox-existente": "Medicamento já registrado.",
+            "data-combobox-novo": "Novo medicamento: será adicionado ao salvar.",
+            "data-combobox-vazio": "Nenhum medicamento registrado ainda. Digite para adicionar.",
+        })
+        self.fields["observacoes"].help_text = "Dose e como dar. Ex.: 1 gota, após o café."
+        self.fields["observacoes"].widget.attrs.update({"placeholder": "Ex.: 1 gota, após o café"})
         self.fields["fim"].help_text = "Deixe vazio enquanto o uso continuar."
-        self.fields["frequencia"].help_text = "Como a equipe lê no plantão. Ex.: 8h e 20h."
+
+    @staticmethod
+    def medicamentos_registrados():
+        """Nomes ja usados em qualquer ficha: a base das sugestoes do campo."""
+        return sorted(set(Medicacao.objects.values_list("nome", flat=True)), key=str.lower)
+
+    def clean_nome(self):
+        nome = " ".join(self.cleaned_data["nome"].split())
+        # Mesmo remedio escrito de outro jeito ("dipirona") reaproveita a grafia registrada.
+        registrado = Medicacao.objects.filter(nome__iexact=nome).values_list("nome", flat=True).first()
+        return registrado or nome
+
+    def clean_horarios(self):
+        return sorted(time.fromisoformat(valor) for valor in self.cleaned_data["horarios"])
 
     def clean(self):
         dados = super().clean()

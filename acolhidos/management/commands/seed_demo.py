@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -139,8 +139,8 @@ class Command(BaseCommand):
                 Medicacao.objects.create(
                     acolhido=acolhido,
                     nome="Vitamina D",
-                    dosagem="1 gota",
-                    frequencia="Manhã",
+                    observacoes="1 gota",
+                    horarios=[time(8)],
                     inicio=entrada,
                 )
 

@@ -104,16 +104,14 @@ if (donationForm) {
   const update = () => {
     const money = type.value === 'DINHEIRO';
     const servico = type.value === 'SERVICO';
-    const item = Boolean(type.value) && !money && !servico;
+    const item = /^c\d+$/.test(type.value);
     mostrar('quantidade', Boolean(type.value) && !money, true);
     mostrar('unidade', servico, true);
-    mostrar('categoria_estoque', item, true);
     mostrar('item_nome', item, true);
     if (item) donationForm.dispatchEvent(new Event('estoque:atualizar'));
     else mostrar('validade', false);
     rotulo('quantidade', item ? 'Quantidade (unidades)' : 'Quantidade', true);
     rotulo('unidade', 'Unidade', true);
-    rotulo('categoria_estoque', 'Categoria no estoque', true);
     rotulo('item_nome', 'Item', true);
     amountField.hidden = !money;
     amount.disabled = !money;

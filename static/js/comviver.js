@@ -150,7 +150,7 @@ document.querySelectorAll('[data-live-filter]').forEach(form => {
     }
   });
   form.parentElement.addEventListener('click', event => {
-    const link = event.target.closest('[data-live-results] a[href*="page="]');
+    const link = event.target.closest('[data-live-results] a[href*="page="], [data-live-results] a[data-sort-link]');
     if (!link) return;
     event.preventDefault();
     atualizar(link.href);

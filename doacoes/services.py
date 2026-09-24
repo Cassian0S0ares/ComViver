@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.db.models import Count, Exists, OuterRef, Q, QuerySet, Sum
 
-from doacoes.models import Doacao, TipoDoacao
+from doacoes.models import Doacao, TipoDoacao, rotulo_do_tipo
 
 
 def totais_por_tipo(consulta: QuerySet[Doacao] | None = None) -> list[dict]:
@@ -12,15 +12,14 @@ def totais_por_tipo(consulta: QuerySet[Doacao] | None = None) -> list[dict]:
     """
     base = consulta if consulta is not None else Doacao.objects.all()
     linhas = (
-        base.values("tipo")
+        base.values("tipo", "categoria__nome")
         .annotate(quantidade=Count("id"), soma=Sum("valor", filter=Q(tipo=TipoDoacao.DINHEIRO)))
-        .order_by("tipo")
+        .order_by("tipo", "categoria__nome")
     )
-    rotulos = dict(TipoDoacao.choices)
     return [
         {
             "tipo": linha["tipo"],
-            "rotulo": rotulos.get(linha["tipo"], linha["tipo"]),
+            "rotulo": linha["categoria__nome"] or rotulo_do_tipo(linha["tipo"], None),
             "quantidade": linha["quantidade"],
             "soma": linha["soma"] or Decimal("0"),
         }

@@ -6,8 +6,18 @@ from django.utils import timezone
 
 from doacoes.factories import CampanhaFactory, DoacaoFactory
 from doacoes.models import Campanha, MetaItemCampanha, TipoDoacao
+from estoque.models import CategoriaItem
 
 pytestmark = pytest.mark.django_db
+
+
+def _cat(nome):
+    return CategoriaItem.objects.get_or_create(nome=nome)[0]
+
+
+def _tipo(nome):
+    """Valor do select de tipo para uma categoria do estoque."""
+    return f"c{_cat(nome).pk}"
 
 
 def dados_campanha(**extra):
@@ -21,10 +31,10 @@ def dados_campanha(**extra):
         "metas-INITIAL_FORMS": "0",
         "metas-MIN_NUM_FORMS": "0",
         "metas-MAX_NUM_FORMS": "1000",
-        "metas-0-tipo": TipoDoacao.VESTUARIO,
+        "metas-0-tipo": _tipo("Vestuário"),
         "metas-0-quantidade": "30",
         "metas-0-unidade": "unidades",
-        "metas-1-tipo": TipoDoacao.ALIMENTO,
+        "metas-1-tipo": _tipo("Alimentos"),
         "metas-1-quantidade": "10",
         "metas-1-unidade": "unidades",
     } | extra
@@ -53,9 +63,9 @@ def test_cria_campanha_com_dinheiro_e_duas_metas_de_itens(client, usuario_admin)
     assert resposta.status_code == 302
     campanha = Campanha.objects.get(nome="Campanha de inverno")
     assert campanha.meta_valor == Decimal("500")
-    assert list(campanha.metas_itens.values_list("tipo", "quantidade", "unidade")) == [
-        (TipoDoacao.VESTUARIO, 30, "unidades"),
-        (TipoDoacao.ALIMENTO, 10, "unidades"),
+    assert list(campanha.metas_itens.values_list("categoria__nome", "quantidade", "unidade")) == [
+        ("Vestuário", 30, "unidades"),
+        ("Alimentos", 10, "unidades"),
     ]
 
 
@@ -90,20 +100,20 @@ def test_meta_de_item_sem_meta_financeira(client, usuario_admin):
 def test_metas_de_itens_somam_apenas_tipo_e_campanha_corretos():
     campanha = CampanhaFactory(meta_valor=Decimal("500"))
     MetaItemCampanha.objects.create(
-        campanha=campanha, tipo=TipoDoacao.VESTUARIO, quantidade=30, unidade="unidades"
+        campanha=campanha, tipo=TipoDoacao.ITEM, categoria=_cat("Vestuário"), quantidade=30, unidade="unidades"
     )
     DoacaoFactory(campanha=campanha, tipo=TipoDoacao.DINHEIRO, valor=200)
     DoacaoFactory(
-        campanha=campanha, tipo=TipoDoacao.VESTUARIO, quantidade=12, unidade="unidades", valor=None
+        campanha=campanha, tipo=TipoDoacao.ITEM, categoria=_cat("Vestuário"), quantidade=12, unidade="unidades", valor=None
     )
     DoacaoFactory(
-        campanha=campanha, tipo=TipoDoacao.VESTUARIO, quantidade=4, unidade="unidades", valor=None
+        campanha=campanha, tipo=TipoDoacao.ITEM, categoria=_cat("Vestuário"), quantidade=4, unidade="unidades", valor=None
     )
     DoacaoFactory(
-        campanha=campanha, tipo=TipoDoacao.ALIMENTO, quantidade=5, unidade="unidades", valor=None
+        campanha=campanha, tipo=TipoDoacao.ITEM, categoria=_cat("Alimentos"), quantidade=5, unidade="unidades", valor=None
     )
     DoacaoFactory(
-        campanha=CampanhaFactory(), tipo=TipoDoacao.VESTUARIO, quantidade=9,
+        campanha=CampanhaFactory(), tipo=TipoDoacao.ITEM, categoria=_cat("Vestuário"), quantidade=9,
         unidade="unidades", valor=None
     )
     dinheiro, roupas = campanha.metas_com_progresso
@@ -117,7 +127,7 @@ def test_metas_duplicadas_nao_salvam_campanha(client, usuario_admin):
     client.force_login(usuario_admin)
     resposta = client.post(
         reverse("doacoes:campanha_nova"),
-        dados_campanha(**{"metas-1-tipo": TipoDoacao.VESTUARIO,
+        dados_campanha(**{"metas-1-tipo": _tipo("Vestuário"),
                          "metas-1-unidade": "unidades"}),
     )
     assert resposta.status_code == 200
@@ -128,10 +138,10 @@ def test_metas_duplicadas_nao_salvam_campanha(client, usuario_admin):
 def test_edicao_altera_e_remove_metas(client, usuario_admin):
     campanha = CampanhaFactory(meta_valor=Decimal("500"))
     primeira = MetaItemCampanha.objects.create(
-        campanha=campanha, tipo=TipoDoacao.VESTUARIO, quantidade=30, unidade="unidades"
+        campanha=campanha, tipo=TipoDoacao.ITEM, categoria=_cat("Vestuário"), quantidade=30, unidade="unidades"
     )
     segunda = MetaItemCampanha.objects.create(
-        campanha=campanha, tipo=TipoDoacao.ALIMENTO, quantidade=10, unidade="unidades"
+        campanha=campanha, tipo=TipoDoacao.ITEM, categoria=_cat("Alimentos"), quantidade=10, unidade="unidades"
     )
     client.force_login(usuario_admin)
     resposta = client.post(
@@ -145,8 +155,8 @@ def test_edicao_altera_e_remove_metas(client, usuario_admin):
         }),
     )
     assert resposta.status_code == 302
-    assert list(campanha.metas_itens.values_list("tipo", "quantidade")) == [
-        (TipoDoacao.VESTUARIO, 40)
+    assert list(campanha.metas_itens.values_list("categoria__nome", "quantidade")) == [
+        ("Vestuário", 40)
     ]
 
 
@@ -164,7 +174,7 @@ def test_unidade_incompativel_nao_salva_campanha(client, usuario_admin):
 def test_pode_substituir_meta_removida_pela_mesma_combinacao(client, usuario_admin):
     campanha = CampanhaFactory(meta_valor=None)
     antiga = MetaItemCampanha.objects.create(
-        campanha=campanha, tipo=TipoDoacao.ALIMENTO, quantidade=10, unidade="unidades"
+        campanha=campanha, tipo=TipoDoacao.ITEM, categoria=_cat("Alimentos"), quantidade=10, unidade="unidades"
     )
     client.force_login(usuario_admin)
     resposta = client.post(
@@ -172,11 +182,11 @@ def test_pode_substituir_meta_removida_pela_mesma_combinacao(client, usuario_adm
         dados_campanha(**{
             "metas-INITIAL_FORMS": "1",
             "metas-0-id": str(antiga.pk),
-            "metas-0-tipo": TipoDoacao.ALIMENTO,
+            "metas-0-tipo": _tipo("Alimentos"),
             "metas-0-quantidade": "10",
             "metas-0-unidade": "unidades",
             "metas-0-DELETE": "on",
-            "metas-1-tipo": TipoDoacao.ALIMENTO,
+            "metas-1-tipo": _tipo("Alimentos"),
             "metas-1-quantidade": "20",
             "metas-1-unidade": "unidades",
         }),
@@ -187,7 +197,7 @@ def test_pode_substituir_meta_removida_pela_mesma_combinacao(client, usuario_adm
 def test_lista_e_detalhe_mostram_todas_as_metas(client, usuario_admin):
     campanha = CampanhaFactory(meta_valor=Decimal("500"))
     MetaItemCampanha.objects.create(
-        campanha=campanha, tipo=TipoDoacao.VESTUARIO, quantidade=30, unidade="unidades"
+        campanha=campanha, tipo=TipoDoacao.ITEM, categoria=_cat("Vestuário"), quantidade=30, unidade="unidades"
     )
     client.force_login(usuario_admin)
     for rota in ("doacoes:campanha_lista", "doacoes:campanha_detalhe"):

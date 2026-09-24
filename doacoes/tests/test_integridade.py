@@ -56,7 +56,7 @@ def test_exclusao_nao_altera_totais_nem_oculta_recorrente():
 
 
 def test_estimativa_de_item_nao_entra_em_soma_monetaria():
-    DoacaoFactory(tipo=TipoDoacao.MATERIAL, valor=Decimal("999.00"))
+    DoacaoFactory(tipo=TipoDoacao.ITEM, valor=Decimal("999.00"))
     assert totais_por_tipo()[0]["soma"] == 0
 
 
@@ -144,7 +144,7 @@ def test_demo_repetivel_nao_apaga_dados():
     original = DoacaoFactory()
     criar_doacoes_demo()
     criar_doacoes_demo()
-    assert Doacao.objects.count() == 7
+    assert Doacao.objects.count() == 1 + len(TipoDoacao.values)
     assert Doador.objects.count() == 6
     assert Campanha.objects.count() == 1
     assert Doacao.objects.filter(pk=original.pk).exists()

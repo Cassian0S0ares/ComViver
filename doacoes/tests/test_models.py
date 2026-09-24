@@ -26,19 +26,19 @@ class TestDoador:
         doador = DoadorFactory()
         DoacaoFactory(doador=doador, tipo=TipoDoacao.DINHEIRO, valor=Decimal("100.00"))
         DoacaoFactory(doador=doador, tipo=TipoDoacao.DINHEIRO, valor=Decimal("50.50"))
-        DoacaoFactory(doador=doador, tipo=TipoDoacao.ALIMENTO, valor=None, quantidade=20)
+        DoacaoFactory(doador=doador, tipo=TipoDoacao.ITEM, valor=None, quantidade=20)
         assert doador.total_doado == Decimal("150.50")
 
     def test_total_doado_zero_sem_doacao_em_dinheiro(self):
         doador = DoadorFactory()
-        DoacaoFactory(doador=doador, tipo=TipoDoacao.ALIMENTO, valor=None)
+        DoacaoFactory(doador=doador, tipo=TipoDoacao.ITEM, valor=None)
         assert doador.total_doado == Decimal("0")
 
 
 class TestDoacao:
     def test_doacao_anonima_e_permitida(self):
         """Doacao anonima e frequente e nao pode travar o registro."""
-        doacao = DoacaoFactory(doador=None, tipo=TipoDoacao.ALIMENTO)
+        doacao = DoacaoFactory(doador=None, tipo=TipoDoacao.ITEM)
         assert doacao.doador is None
         assert Doacao.objects.filter(pk=doacao.pk).exists()
 
@@ -55,7 +55,7 @@ class TestDoacao:
 
     def test_data_futura_e_recusada(self):
         doacao = DoacaoFactory.build(
-            data_recebimento=date.today() + timedelta(days=1), tipo=TipoDoacao.ALIMENTO
+            data_recebimento=date.today() + timedelta(days=1), tipo=TipoDoacao.ITEM
         )
         with pytest.raises(ValidationError) as erro:
             doacao.full_clean()
@@ -63,7 +63,7 @@ class TestDoacao:
 
     def test_descricao_quantidade_de_item_contavel(self):
         doacao = DoacaoFactory(
-            tipo=TipoDoacao.ALIMENTO,
+            tipo=TipoDoacao.ITEM,
             descricao="Arroz 5kg",
             quantidade=20,
             unidade="unidades",

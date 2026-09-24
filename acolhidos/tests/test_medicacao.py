@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 
 import pytest
 from django.urls import reverse
@@ -15,11 +15,10 @@ HOJE = date.today()
 def dados(**extra):
     return {
         "nome": "Dipirona",
-        "dosagem": "500mg",
-        "frequencia": "8h e 20h",
+        "horarios": ["08:00", "20:00"],
         "inicio": HOJE.isoformat(),
         "fim": "",
-        "observacoes": "",
+        "observacoes": "500mg",
     } | extra
 
 
@@ -73,14 +72,50 @@ class TestCadastro:
         client.post(reverse("acolhidos:medicacao_nova", args=[acolhido.pk]), dados())
         assert LogAcessoFicha.objects.filter(acolhido=acolhido, acao=AcaoFicha.EDIT).exists()
 
-    def test_tecnico_corrige_a_dosagem(self, client, usuario_tecnico):
-        medicacao = MedicacaoFactory(dosagem="500mg")
+    def test_tecnico_corrige_a_dose_nas_observacoes(self, client, usuario_tecnico):
+        medicacao = MedicacaoFactory(observacoes="500mg")
         client.force_login(usuario_tecnico)
         client.post(
-            reverse("acolhidos:medicacao_editar", args=[medicacao.pk]), dados(dosagem="250mg")
+            reverse("acolhidos:medicacao_editar", args=[medicacao.pk]),
+            dados(observacoes="250mg", horarios=["07:00", "13:00", "21:00"]),
         )
         medicacao.refresh_from_db()
-        assert medicacao.dosagem == "250mg"
+        assert medicacao.observacoes == "250mg"
+        assert medicacao.horarios == [time(7), time(13), time(21)]
+        assert medicacao.horarios_rotulo == "07:00 · 13:00 · 21:00"
+
+    def test_exige_pelo_menos_um_horario(self, client, usuario_tecnico):
+        acolhido = AcolhidoFactory()
+        client.force_login(usuario_tecnico)
+        resposta = client.post(reverse("acolhidos:medicacao_nova", args=[acolhido.pk]),
+                               dados(horarios=[]))
+        assert "Marque pelo menos um horário." in resposta.content.decode()
+        assert not Medicacao.objects.filter(acolhido=acolhido).exists()
+
+    def test_horario_fora_da_lista_e_recusado(self, client, usuario_tecnico):
+        acolhido = AcolhidoFactory()
+        client.force_login(usuario_tecnico)
+        resposta = client.post(reverse("acolhidos:medicacao_nova", args=[acolhido.pk]),
+                               dados(horarios=["08:15"]))
+        assert resposta.status_code == 200
+        assert not Medicacao.objects.filter(acolhido=acolhido).exists()
+
+    def test_formulario_sugere_medicamentos_ja_registrados(self, client, usuario_tecnico):
+        MedicacaoFactory(nome="Vitamina D")
+        acolhido = AcolhidoFactory()
+        client.force_login(usuario_tecnico)
+        html = client.get(reverse("acolhidos:medicacao_nova", args=[acolhido.pk])).content.decode()
+        assert '<datalist id="medicamentos-lista"><option value="Vitamina D">' in html
+        assert 'data-combobox' in html and 'value="13:00"' in html
+        assert 'name="dosagem"' not in html and 'name="frequencia"' not in html
+
+    def test_mesmo_medicamento_reaproveita_a_grafia_registrada(self, client, usuario_tecnico):
+        MedicacaoFactory(nome="Vitamina D")
+        acolhido = AcolhidoFactory()
+        client.force_login(usuario_tecnico)
+        client.post(reverse("acolhidos:medicacao_nova", args=[acolhido.pk]),
+                    dados(nome="  vitamina   d "))
+        assert Medicacao.objects.get(acolhido=acolhido).nome == "Vitamina D"
 
     def test_fim_antes_do_inicio_e_recusado(self, client, usuario_tecnico):
         acolhido = AcolhidoFactory()
