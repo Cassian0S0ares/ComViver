@@ -7,8 +7,10 @@ Set-Location (Split-Path $PSScriptRoot -Parent)
 
 $venv = ".venv-deploy"
 if (-not (Test-Path "$venv\Scripts\python.exe")) {
-    py -3.12 -m venv $venv 2>$null
-    if (-not (Test-Path "$venv\Scripts\python.exe")) {
+    $tem312 = (py -0 | Out-String) -match "3\.12"
+    if ($tem312) {
+        py -3.12 -m venv $venv
+    } else {
         Write-Host "Python 3.12 não encontrado; usando o Python padrão." -ForegroundColor Yellow
         py -m venv $venv
     }
