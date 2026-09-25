@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ComViver
+Comment=Inicia o servidor de desenvolvimento do ComViver
+Exec=bash -c '"$HOME/ComViver/iniciar.sh"'
+Path=/home/cranio/ComViver
+Terminal=true
+Icon=utilities-terminal
+Categories=Development;
